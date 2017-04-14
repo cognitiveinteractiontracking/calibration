@@ -9,6 +9,9 @@
 
 std::vector<tf::Pose> poses;
 std::atomic<std::size_t> atomicCounter;
+static std::vector<ros::Publisher> pubOdom;
+static ros::Subscriber sub;
+
 void callback(nav_msgs::OdometryConstPtr msg) {
 
   if (atomicCounter > 0) {
@@ -20,10 +23,20 @@ void callback(nav_msgs::OdometryConstPtr msg) {
   }
 }
 
-static std::vector<ros::Publisher> pubOdom;
-static ros::Subscriber sub;
+std::string print(const std::vector<tf::Pose> &poses) {
+  std::stringstream ss;
+  ss << "Transformation from marker to camera coordinate system (X Y Z x y z w): " <<
+                  poses.at(0).getOrigin().getX() << " " <<
+                  poses.at(0).getOrigin().getY() << " " <<
+                  poses.at(0).getOrigin().getZ() << " " <<
+                  poses.at(0).getRotation().x() << " " <<
+                  poses.at(0).getRotation().y() << " " <<
+                  poses.at(0).getRotation().z() << " " <<
+                  poses.at(0).getRotation().w();
+  return ss.str();
+}
+
 int main(int argc, char** argv) {
-  char glutGamemode[32];
 
   ros::init(argc, argv, "one_shot_calib_node");
   ros::NodeHandle n("~");
@@ -32,7 +45,7 @@ int main(int argc, char** argv) {
   int counter;
   n.param<std::string>("topic", topic, "/odom");
   n.param<int>("number_percepts_for_average", counter, 1);
-  // Rounding to the next power of 2 for correct mean calculation
+  // Rounding to the next power of 2 for correct average mean calculation
   counter = pow(2, ceil(log(counter)/log(2)));
   ROS_INFO_STREAM("Using " << counter << " percepts");
 
@@ -42,6 +55,7 @@ int main(int argc, char** argv) {
   ROS_INFO_STREAM("Start listening on " << topic);
   ros::Subscriber sub = n.subscribe(topic, 1, callback);
 
+  // Check until the pose vector is filled up
   ros::Rate rate(100);
   while(ros::ok()) {
       if (!atomicCounter) {
@@ -66,26 +80,11 @@ int main(int argc, char** argv) {
             poses.at(idSingle).setRotation(posesTmp.slerp(poses.at(idDouble+1).getRotation(), 0.5));
 //            ROS_INFO_STREAM("poses.at(idSingle).getOrigin().getX(): " << poses.at(idSingle).getOrigin().getX());
         }
-        ROS_INFO_STREAM("Transformation from marker to camera coordinate system (X Y Z x y z w): " <<
-                        poses.at(0).getOrigin().getX() << " " <<
-                        poses.at(0).getOrigin().getY() << " " <<
-                        poses.at(0).getOrigin().getZ() << " " <<
-                        poses.at(0).getRotation().x() << " " <<
-                        poses.at(0).getRotation().y() << " " <<
-                        poses.at(0).getRotation().z() << " " <<
-                        poses.at(0).getRotation().w());
-
+        ROS_INFO_STREAM(print(poses));
       }
   }
 
-  ROS_INFO_STREAM("FINAL: Transformation from marker to camera coordinate system (X Y Z x y z w): " <<
-                  poses.at(0).getOrigin().getX() << " " <<
-                  poses.at(0).getOrigin().getY() << " " <<
-                  poses.at(0).getOrigin().getZ() << " " <<
-                  poses.at(0).getRotation().x() << " " <<
-                  poses.at(0).getRotation().y() << " " <<
-                  poses.at(0).getRotation().z() << " " <<
-                  poses.at(0).getRotation().w());
+  ROS_INFO_STREAM("FINAL CONFIGURATION: " << print(poses));
 
   return 0;
 }
