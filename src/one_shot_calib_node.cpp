@@ -5,6 +5,7 @@
 #include <nav_msgs/Odometry.h>
 #include <tf/tf.h>
 #include <atomic>
+#include <calib/dynamic_transform_publisher.h>
 
 
 std::vector<tf::Pose> poses;
@@ -21,19 +22,6 @@ void callback(nav_msgs::OdometryConstPtr msg) {
     poses.at(atomicCounter-1) = poseMarker2Camera;
     --atomicCounter;
   }
-}
-
-std::string print(const std::vector<tf::Pose> &poses) {
-  std::stringstream ss;
-  ss << "Transformation from marker to camera coordinate system (X Y Z x y z w): " <<
-                  poses.at(0).getOrigin().getX() << " " <<
-                  poses.at(0).getOrigin().getY() << " " <<
-                  poses.at(0).getOrigin().getZ() << " " <<
-                  poses.at(0).getRotation().x() << " " <<
-                  poses.at(0).getRotation().y() << " " <<
-                  poses.at(0).getRotation().z() << " " <<
-                  poses.at(0).getRotation().w();
-  return ss.str();
 }
 
 int main(int argc, char** argv) {
@@ -80,11 +68,12 @@ int main(int argc, char** argv) {
             poses.at(idSingle).setRotation(posesTmp.slerp(poses.at(idDouble+1).getRotation(), 0.5));
 //            ROS_INFO_STREAM("poses.at(idSingle).getOrigin().getX(): " << poses.at(idSingle).getOrigin().getX());
         }
-        ROS_INFO_STREAM(print(poses));
+        ROS_INFO_STREAM("Transformation from marker to camera coordinate system" << dynamic_transform_publisher::getEulerString(poses.at(0)));
       }
   }
 
-  ROS_INFO_STREAM("FINAL CONFIGURATION: " << print(poses));
-
+  ROS_INFO_STREAM("Transformation from marker to camera coordinate system\n" <<
+                  dynamic_transform_publisher::getEulerString(poses.at(0)) << "\nor\n" <<
+                  dynamic_transform_publisher::getQuatString(poses.at(0)) << "\nor\n");
   return 0;
 }
