@@ -32,7 +32,8 @@ int main(int argc, char** argv) {
   std::string topic;
   int counter;
   n.param<std::string>("topic", topic, "/odom");
-  n.param<int>("number_percepts_for_average", counter, 1);
+  n.param<int>("percepts", counter, 1);
+  n.param<int>("debug_evolution", counter, 1);
   // Rounding to the next power of 2 for correct average mean calculation
   counter = pow(2, ceil(log(counter)/log(2)));
   ROS_INFO_STREAM("Using " << counter << " percepts");
@@ -53,7 +54,7 @@ int main(int argc, char** argv) {
       rate.sleep();
   }
 
-  // Refinement
+  // Refinement: Averaging the percepts
   if (poses.size() != 1) {
       for (int idx = poses.size(); idx > 1; idx /= 2) {
         int idSingle = 0, idDouble = 0;
@@ -68,11 +69,11 @@ int main(int argc, char** argv) {
             poses.at(idSingle).setRotation(posesTmp.slerp(poses.at(idDouble+1).getRotation(), 0.5));
 //            ROS_INFO_STREAM("poses.at(idSingle).getOrigin().getX(): " << poses.at(idSingle).getOrigin().getX());
         }
-        ROS_INFO_STREAM("Transformation from marker to camera coordinate system" << dynamic_transform_publisher::getEulerString(poses.at(0)));
+        ROS_INFO_STREAM( log2(poses.size() / idx) << "/" << log2(poses.size()) << ": Transformation from marker to camera coordinate system" << dynamic_transform_publisher::getEulerString(poses.at(0)));
       }
   }
 
-  ROS_INFO_STREAM("Transformation from marker to camera coordinate system\n" <<
+  ROS_INFO_STREAM("FINAL: Transformation from marker to camera coordinate system\n" <<
                   dynamic_transform_publisher::getEulerString(poses.at(0)) << "\nor\n" <<
                   dynamic_transform_publisher::getQuatString(poses.at(0)) << "\nor\n");
   return 0;

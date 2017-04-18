@@ -66,7 +66,7 @@ namespace dynamic_transform_publisher {
 
   std::string getQuatString(const tf::Pose &pose) {
     std::stringstream ss;
-    ss << "(X Y Z roll pitch yaw): " <<
+    ss << "(X Y Z x y z w): " <<
                     pose.getOrigin().getX() << " " <<
                     pose.getOrigin().getY() << " " <<
                     pose.getOrigin().getZ() << " " <<
