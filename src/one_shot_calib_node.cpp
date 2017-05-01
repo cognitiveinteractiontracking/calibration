@@ -33,7 +33,6 @@ int main(int argc, char** argv) {
   int counter;
   n.param<std::string>("topic", topic, "/odom");
   n.param<int>("percepts", counter, 1);
-  n.param<int>("debug_evolution", counter, 1);
   // Rounding to the next power of 2 for correct average mean calculation
   counter = pow(2, ceil(log(counter)/log(2)));
   ROS_INFO_STREAM("Using " << counter << " percepts");
