@@ -26,7 +26,7 @@ catkin_package(
  INCLUDE_DIRS include
  LIBRARIES genicam arghandler
  CATKIN_DEPENDS roscpp rospy std_msgs nav_msgs tf tf2 dynamic_reconfigure
- DEPENDS system_lib
+# DEPENDS system_lib
 )
 
 include_directories(
