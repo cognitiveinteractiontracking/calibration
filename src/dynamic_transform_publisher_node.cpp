@@ -61,13 +61,14 @@ int main(int argc, char** argv) {
             tf::createQuaternionFromRPY(tfVecDbl.at(3), tfVecDbl.at(4), tfVecDbl.at(5)),
             tf::Vector3(tfVecDbl.at(0), tfVecDbl.at(1), tfVecDbl.at(2)));
     } else if (tfVecStr.size() == tfQuatComponents) {
-        ROS_INFO("Use tf with (x,y,z,r,p,y): %s", tfStr.c_str());
+        ROS_INFO("Use tf with (x,y,z,qx,qy,qz,qw): %s", tfStr.c_str());
         tfVecDbl.resize(tfQuatComponents);
-        for (int idx = 0; idx < tfEulerComponents; ++idx) {
+        for (int idx = 0; idx < tfQuatComponents; ++idx) {
             tfVecDbl.at(idx) = std::stod(tfVecStr.at(idx));
         }
         transform = tf::Pose(
-            tf::createQuaternionFromRPY(tfVecDbl.at(3), tfVecDbl.at(4), tfVecDbl.at(5)),
+//            tf::createQuaternionFromRPY(tfVecDbl.at(3), tfVecDbl.at(4), tfVecDbl.at(5)),
+            tf::Quaternion(tfVecDbl.at(3), tfVecDbl.at(4), tfVecDbl.at(5), tfVecDbl.at(6)),
             tf::Vector3(tfVecDbl.at(0), tfVecDbl.at(1), tfVecDbl.at(2)));
     }
     // Tell the reconfiguration server about the given setup, but keep the local values by spinning once
