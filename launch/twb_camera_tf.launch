@@ -1,0 +1,29 @@
+<launch>
+  <node pkg="calib" type="dynamic_transform_publisher" name="tf_cam1" output="screen">
+    <param name="tf" value="1.05607 1.02835 3.75077 3.1403 0.0130538 0.0128875"/>
+    <param name="source_frame" value="odom"/>
+    <param name="target_frame" value="cam1"/>
+    <param name="rate" value="50.0"/>
+  </node>
+  
+  <node pkg="calib" type="dynamic_transform_publisher" name="tf_cam2">
+    <param name="tf" value="-1.17593 1.01132 3.7598 3.14088 0.0188043 0.0120546"/>
+    <param name="source_frame" value="odom"/>
+    <param name="target_frame" value="cam2"/>
+    <param name="rate" value="50.0"/>
+  </node>
+  
+  <node pkg="calib" type="dynamic_transform_publisher" name="tf_cam3">
+    <param name="tf" value="-1.26136 -1.17899 3.65471 3.13637 0.0045412 0.0100898"/>
+    <param name="source_frame" value="odom"/>
+    <param name="target_frame" value="cam3"/>
+    <param name="rate" value="50.0"/>
+  </node>
+  
+  <node pkg="calib" type="dynamic_transform_publisher" name="tf_cam4">
+    <param name="tf" value="0.90784 -1.33372 3.71171 -3.13787 -0.0144063 -0.00311037"/>
+    <param name="source_frame" value="odom"/>
+    <param name="target_frame" value="cam4"/>
+    <param name="rate" value="50.0"/>
+  </node>
+</launch>  
