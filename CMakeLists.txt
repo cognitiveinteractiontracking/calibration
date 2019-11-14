@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(calib)
+project(calibration)
 
 add_definitions(-std=c++11)
 
@@ -12,14 +12,10 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   std_msgs
   sensor_msgs
-  cv_bridge
   tf
   tf2
   dynamic_reconfigure
 )
-
-find_package(aruco3 3.0.9 REQUIRED)
-find_package(OpenCV 3.1 REQUIRED)
 
 include_directories(
   ${catkin_INCLUDE_DIRS}
@@ -53,12 +49,10 @@ target_link_libraries(dynamic_transform_publisher
   ${catkin_LIBRARIES}
 )
 
-add_executable(aruco3_test src/aruco3_test.cpp)
+add_executable(odom_to_tf src/odom_to_tf.cpp)
 
-target_link_libraries(aruco3_test
+target_link_libraries(odom_to_tf
   ${catkin_LIBRARIES}
-  ${OpenCV_LIBRARIES}
-  ${aruco_LIBS}
-  )
+)
 
 add_dependencies(dynamic_transform_publisher ${PROJECT_NAME}_gencfg)

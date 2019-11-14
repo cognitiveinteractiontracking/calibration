@@ -3,8 +3,8 @@
 #include <boost/algorithm/string.hpp>
 #include <tf/transform_broadcaster.h>
 #include <dynamic_reconfigure/server.h>
-#include <calib/TransformConfig.h>
-#include <calib/dynamic_transform_publisher.h>
+#include <calibration/TransformConfig.h>
+#include <calibration/dynamic_transform_publisher.h>
 
 static tf::Transform transform;
 

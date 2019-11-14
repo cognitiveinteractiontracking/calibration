@@ -1,0 +1,15 @@
+#!/bin/bash
+
+# Takes exactly as the static_transform_publisher, but publishes the inverse
+
+x="$1"
+y="$2"
+z="$3"
+R="$4"
+P="$5"
+Y="$6"
+S="$7"
+T="$8"
+H="$9"
+
+rosrun tf static_transform_publisher $(rosrun calibration inverse_transform.py -x ${x} -y ${y} -z ${z} -R ${R} -P ${P} -Y ${Y}) ${T} ${S} ${H}
