@@ -1,0 +1,62 @@
+#!/bin/bash
+
+# Takes exactly as the static_transform_publisher, but with the pose argument formated as string: "-x .. -y .. -z .. -R .. -P .. -Y .."
+# E.g.: rosrun calibration static_transform_publisher_pose '-x -2 -y -2 -z -0.01 -R 0 -P 0 -Y 2.0' a b 10
+
+POSE="$1"
+S="$2"
+T="$3"
+H="$4"
+
+function parser() {
+x="0.0"
+y="0.0"
+z="0.0"
+R="0.0"
+P="0.0"
+Y="0.0"
+
+POSITIONAL=()
+while [[ $# -gt 0 ]]
+do
+key="$1"
+
+case $key in
+    -x)
+    x="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -y)
+    y="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -z)
+    z="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -R)
+    R=$2
+    shift # past argument
+    shift # past value
+    ;;
+    -P)
+    P=$2
+    shift # past argument
+    shift # past value
+    ;;
+    -Y)
+    Y=$2
+    shift # past argument
+    shift # past value
+    ;;
+esac
+done
+set -- "${POSITIONAL[@]}" # restore positional parameters
+echo "${x} ${y} ${z} ${Y} ${P} ${R}"
+}
+
+echo "Execute: 'rosrun tf static_transform_publisher $(parser $POSE) ${S} ${T} ${H}'"
+rosrun tf static_transform_publisher $(parser $POSE) ${S} ${T} ${H}

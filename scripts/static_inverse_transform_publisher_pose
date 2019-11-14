@@ -1,0 +1,10 @@
+#!/bin/bash
+
+# Takes exactly as the static_inverse_transform_publisher, but with the pose argument formated as string: "-x .. -y .. -z .. -R .. -P .. -Y .."
+
+POSE="$1"
+S="$2"
+T="$3"
+H="$4"
+
+rosrun tf static_transform_publisher $(rosrun calibration inverse_transform.py ${POSE}) ${T} ${S} ${H}
