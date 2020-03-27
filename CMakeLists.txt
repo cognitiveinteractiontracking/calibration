@@ -21,9 +21,13 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 
+catkin_python_setup()
+
 generate_dynamic_reconfigure_options(
   cfg/Transform.cfg
 )
+
+catkin_package()
 
 catkin_package(
  INCLUDE_DIRS include

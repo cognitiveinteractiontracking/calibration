@@ -8,6 +8,11 @@ tbd
 
 tbd
 
+
+## yaml_handler.py
+
+Load calibration.yaml (sensor pose, path rosbag tracking data) via rosparam. The script will read the rosbags, transform the poses to the same frame as the sensors und output the data to a gm2dl file, which is readable for the g2o library.
+
 ## inverse_transform.py
 
 Calculates the inverse transformation and prints it to std::out so that it can be used by tf static_transform_publisher

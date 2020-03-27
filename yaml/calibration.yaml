@@ -1,0 +1,29 @@
+
+# Offset calibration for s1 which is applied after calibration
+# Choose either <calibration_marker_id> or <calibration_offset>
+#calibration_marker_id: 0
+calibration_offset: {x: 1.5 , y: -1.5 , z: -1.7, qx: 0.0, qy: 0.0, qz: 0.0, qw: 1.0}
+
+# Bag location which holds the marker tracks
+s1_bag: ./tracking_bags/surface_size_150_apriltag36h11_id_0_degree_0_cam1_2_3_4_5_2018-05-11-17-00-32.bag_speed_0.4_aruco3_node1_2.conservative_notTracking.bag
+# Topic inside the bag which holds the marker sub-topics like <s1_topic>/42
+s1_topic: /aruco3_node1_2/cam/odom/
+# Initial camera pose in an arbitrary frame
+s1_pose: {x: 1.5 , y: -1.5 , z: -1.7, qx: 0.0, qy: 0.0, qz: 0.0, qw: 1.0}
+# Used to reconfigure the sensor's tranform after calibration via e.g. "rosrun dynamic_reconfigure dynparam set <s1_dyn_tf_node_name> "{'x':2.0, 'y':3.0, 'z':1.5, 'roll': 0.1, 'pitch': 0.2, 'yaw': 0.3}""
+s1_dyn_tf_node_name: dynamic_transform_publisher_1
+
+s2_bag: ./tracking_bags/surface_size_150_apriltag36h11_id_0_degree_0_cam1_2_3_4_5_2018-05-11-17-00-32.bag_speed_0.4_aruco3_node2_2.conservative_notTracking.bag
+s2_topic: /aruco3_node2_2/cam/odom/
+s2_pose: {x: -1.3071 , y: -1.5390 , z: -1.5390, qx: 0.0365, qy: -0.041, qz: -0.7036, qw: 0.7085}
+s2_dyn_tf_node_name: dynamic_transform_publisher_2
+
+s3_bag: ./tracking_bags/surface_size_150_apriltag36h11_id_0_degree_0_cam1_2_3_4_5_2018-05-11-17-00-32.bag_speed_0.4_aruco3_node3_2.conservative_notTracking.bag
+s3_topic: /aruco3_node3_2/cam/odom/
+s3_pose: {x: -1.6830 , y: 1.3908 , z: -1.7717, qx: 0.0019, qy: -0.0318, qz: -0.0052, qw: 0.9995}
+s3_dyn_tf_node_name: dynamic_transform_publisher_3
+
+s4_bag: ./tracking_bags/surface_size_150_apriltag36h11_id_0_degree_0_cam1_2_3_4_5_2018-05-11-17-00-32.bag_speed_0.4_aruco3_node4_2.conservative_notTracking.bag
+s4_topic: /aruco3_node4_2/cam/odom/
+s4_pose: {x: 1.4243 , y: 1.5012 , z: -1.6682, qx: -0.0122, qy: -0.0055, qz: -0.7130, qw: 0.7010}
+s4_dyn_tf_node_name: dynamic_transform_publisher_4
