@@ -62,7 +62,7 @@ def check_id_num(input):
 if __name__ == '__main__':
     rospy.init_node('yamlhandler')
 
-    g2oFile = open("calib_data.gm2dl", "w+")
+    g2oFile = open("graph.gm2dl", "w+")
 
     sensor_list, pose, quat = [], [], []
     bag_loc, ros_topic, node_name = "", "", ""
@@ -95,6 +95,7 @@ if __name__ == '__main__':
 
     tracking_points, node_list, unique_list = [], [], []
     bag_num = 1
+    fixed_sensor = sensor_list[0].sensor_id
 
     for sensor in sensor_list:
         bag = rosbag.Bag(sensor.bag_location)
@@ -107,7 +108,7 @@ if __name__ == '__main__':
 
             tracker_id = check_id_num(msg.child_frame_id)
 
-            # Be sure that tracking point is linked to sensor only one time
+            # Only use the first entry of tracking point in rosbag  TODO: Use mean value over time?
             if tracker_id in unique_list:
                 continue;
 
@@ -122,10 +123,12 @@ if __name__ == '__main__':
 
             tracking_points.append(Tracking_Point(i-1, tracker_id, cam_id, pose, quat))
             unique_list.append(tracker_id)
+
             pose = []
             quat = []
 
-            i += 1
+            if sensor.sensor_id is fixed_sensor:
+                i += 1
 
         unique_list = []
         bag.close()
@@ -150,56 +153,68 @@ if __name__ == '__main__':
         m.transform.rotation.w = snode.quat[3]
         t.setTransform(m)
 
-
         g2oFile.write("VERTEX_SE3:QUAT "+str(snode.node_id)+" "+str(snode.pos[0])+" "+
                       str(snode.pos[1])+" "+str(snode.pos[2])+" "+str(snode.quat[0])+" "+
                       str(snode.quat[1])+" "+str(snode.quat[2])+" "+str(snode.quat[3])+"\n")
 
+        # Fixing values for first sensor
+        if snode.sensor_id is fixed_sensor:
+            g2oFile.write("FIX "+str(snode.node_id)+"\n")
 
     msg_point = geometry_msgs.msg.PoseStamped()
     trans = geometry_msgs.msg.PoseStamped()
 
     for tnode in tracking_points:
 
-        # Add tracker frames
-        m = geometry_msgs.msg.TransformStamped()
-        m.header.frame_id = "s"+str(tnode.sensor_id)
-        m.child_frame_id = "t"+str(tnode.node_id)
-        m.transform.translation.x = tnode.pos[0]
-        m.transform.translation.y = tnode.pos[1]
-        m.transform.translation.z = tnode.pos[2]
-        m.transform.rotation.x = tnode.quat[0]
-        m.transform.rotation.y = tnode.quat[1]
-        m.transform.rotation.z = tnode.quat[2]
-        m.transform.rotation.w = tnode.quat[3]
-        t.setTransform(m)
+        if tnode.sensor_id is fixed_sensor:
+            # Add tracker frames
+            m = geometry_msgs.msg.TransformStamped()
+            m.header.frame_id = "s"+str(tnode.sensor_id)
+            m.child_frame_id = "t"+str(tnode.node_id)
+            m.transform.translation.x = tnode.pos[0]
+            m.transform.translation.y = tnode.pos[1]
+            m.transform.translation.z = tnode.pos[2]
+            m.transform.rotation.x = tnode.quat[0]
+            m.transform.rotation.y = tnode.quat[1]
+            m.transform.rotation.z = tnode.quat[2]
+            m.transform.rotation.w = tnode.quat[3]
+            t.setTransform(m)
 
-        # Convert tracking point from list to correct geometry_msgs.msg
-        msg_point.header.frame_id = "s"+str(tnode.sensor_id)
-        msg_point.pose.position.x = tnode.pos[0]
-        msg_point.pose.position.y = tnode.pos[1]
-        msg_point.pose.position.z = tnode.pos[2]
-        msg_point.pose.orientation.x = tnode.quat[0]
-        msg_point.pose.orientation.y = tnode.quat[1]
-        msg_point.pose.orientation.z = tnode.quat[2]
-        msg_point.pose.orientation.w = tnode.quat[3]
+            # Convert tracking point from list to correct geometry_msgs.msg
+            msg_point.header.frame_id = "s"+str(tnode.sensor_id)
+            msg_point.pose.position.x = tnode.pos[0]
+            msg_point.pose.position.y = tnode.pos[1]
+            msg_point.pose.position.z = tnode.pos[2]
+            msg_point.pose.orientation.x = tnode.quat[0]
+            msg_point.pose.orientation.y = tnode.quat[1]
+            msg_point.pose.orientation.z = tnode.quat[2]
+            msg_point.pose.orientation.w = tnode.quat[3]
 
-        # Transform tracking point in sensor frame to world frame
-        trans = t.transformPose("world", msg_point)
+            # Transform tracking point in sensor frame to world frame
+            trans = t.transformPose("world", msg_point)
 
-        tpose = trans.pose.position
-        tquat = trans.pose.orientation
+            tpose = trans.pose.position
+            tquat = trans.pose.orientation
 
-        g2oFile.write("VERTEX_SE3:QUAT "+str(tnode.node_id)+" "+str(tpose.x)+" "+
+            g2oFile.write("VERTEX_SE3:QUAT "+str(tnode.tracker_id)+" "+str(tpose.x)+" "+
                       str(tpose.y)+" "+str(tpose.z)+" "+str(tquat.x)+" "+
                       str(tquat.y)+" "+str(tquat.z)+" "+str(tquat.w)+"\n")
+            g2oFile.write("FIX "+str(tnode.tracker_id)+"\n")
+
+    fixed_cov = " 10000 0 0 0 0 0 10000 0 0 0 0 10000 0 0 0 40000 0 0 40000 0 40000 "
+    valid_point_list = []
 
     for tpoint in tracking_points:
-        # Edges are relative transforms from tracking point to associated sensor frame
-        g2oFile.write("EDGE_SE3:QUAT "+str(tpoint.sensor_id-1)+" "+str(tpoint.node_id)+" "+
+        if tpoint.sensor_id is fixed_sensor:
+            valid_point_list.append(tpoint.tracker_id)
+
+    for tpoint in tracking_points:
+        if tpoint.tracker_id in valid_point_list:
+            g2oFile.write("EDGE_SE3:QUAT "+str(tpoint.sensor_id-1)+" "+str(tpoint.tracker_id)+" "+
                       str(tpoint.pos[0])+" "+str(tpoint.pos[1])+" "+str(tpoint.pos[2])+" "+
                       str(tpoint.quat[0])+" "+str(tpoint.quat[1])+" "+str(tpoint.quat[2])+" "+
-                      str(tpoint.quat[3])+"\n")
+                      str(tpoint.quat[3])+fixed_cov+"\n")
+
 
     g2oFile.close()
     print("Done...")
