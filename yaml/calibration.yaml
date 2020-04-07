@@ -2,7 +2,7 @@
 # Offset calibration for s1 which is applied after calibration
 # Choose either <calibration_marker_id> or <calibration_offset>
 #calibration_marker_id: 0
-calibration_offset: {x: 1.5 , y: -1.5 , z: -1.7, qx: 0.0, qy: 0.0, qz: 0.0, qw: 1.0}
+calibration_offset: {x: 1.5 , y: 1.503 , z: 3.698, qx: 1.0, qy: 0.0, qz: 0.0, qw: 0.001}
 
 # Bag location which holds the marker tracks
 s1_bag: ./tracking_bags/surface_size_150_apriltag36h11_id_0_degree_0_cam1_2_3_4_5_2018-05-11-17-00-32.bag_speed_0.4_aruco3_node1_2.conservative_notTracking.bag
