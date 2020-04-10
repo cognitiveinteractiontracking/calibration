@@ -3,54 +3,66 @@ import rospy
 import rosbag
 import tf
 import geometry_msgs.msg
+import numpy as np
+import g2o
+
 
 class Sensor:
-    def __init__(self, node_id, sensor_id, pos, quat, bag_location, ros_topic, node_name):
-        self.node_id = node_id
+    def __init__(self, sensor_id, pos, quat, bag_location, ros_topic, node_name):
         self.sensor_id = sensor_id
         self.pos = pos
         self.quat = quat
         self.bag_location = bag_location
         self.ros_topic = ros_topic
         self.node_name = node_name
-        if len(pos) is not 3:
-            print("Warning: Position of sensor "+self.id+" not completely described!")
-        if len(quat) is not 4:
-            print("Warning: Rotation of sensor "+self.id+" not completely described!")
 
-    def info(self):
-        print("Sensor "+str(self.sensor_id)+":")
-        print("   node id = "+str(self.node_id))
-        print("   pose: x="+str(self.pos[0])+" y="+str(self.pos[1])+
-              " z="+str(self.pos[2]))
-        print("   quaternion: qx="+str(self.quat[0])+" qy="+str(self.quat[1])+
-              " qz="+str(self.quat[2])+" qw="+str(self.quat[3]))
-        print("   bag_location = "+str(self.bag_location))
-        print("   ros_topic = "+str(self.ros_topic))
-        print("   node_name = "+str(self.node_name))
-        print("\n")
 
 class Tracking_Point:
-    def __init__(self, node_id, tracker_id, sensor_id, pos, quat):
-        self.node_id = node_id
+    def __init__(self, tracker_id, sensor_id, pos, quat):
         self.tracker_id = tracker_id
         self.sensor_id = sensor_id
         self.pos = pos
         self.quat = quat
-        if len(pos) is not 3:
-            print("Warning: Position of tracking point "+self.tracker_id+" not completely described!")
-        if len(quat) is not 4:
-            print("Warning: Rotation of tracking point "+self.tracker_id+" not completely described!")
 
-    def info(self):
-        print("Tracking Point "+str(self.tracker_id)+":")
-        print("   node id = "+str(self.node_id))
-        print("   cam_id = "+str(self.sensor_id))
-        print("   pose: x="+str(self.pos[0])+" y="+str(self.pos[1])+
-              " z="+str(self.pos[2]))
-        print("   quaternion: qx="+str(self.quat[0])+" qy="+str(self.quat[1])+
-              " qz="+str(self.quat[2])+" qw="+str(self.quat[3]))
-        print("\n")
+
+class GraphOptimizer(g2o.SparseOptimizer):
+    def __init__(self):
+        super(GraphOptimizer, self).__init__()
+        solver = g2o.BlockSolverSE3(g2o.LinearSolverCholmodSE3())
+        solver = g2o.OptimizationAlgorithmLevenberg(solver)
+        super(GraphOptimizer, self).set_algorithm(solver)
+
+    def optimize(self, max_iterations=20):
+        super(GraphOptimizer, self).initialize_optimization()
+        super(GraphOptimizer, self).optimize(max_iterations)
+
+    def add_vertex(self, id, pose, fixed=False):
+        v_se3 = g2o.VertexSE3()
+        v_se3.set_id(id)
+        v_se3.set_estimate(pose) # g2o.SE3Quat().Isometry3d()
+        v_se3.set_fixed(fixed)   # Fixation of relation point of graph
+        super(GraphOptimizer, self).add_vertex(v_se3)
+
+    def add_edge(self, vertices, measurement, information):
+        edge = g2o.EdgeSE3()
+        for i, v in enumerate(vertices):
+            if isinstance(v, int):
+                v = self.vertex(v)
+            edge.set_vertex(i, v)
+        edge.set_measurement(measurement)
+        edge.set_information(information)
+        super(GraphOptimizer, self).add_edge(edge)
+
+    def get_pose(self, id):
+        pose = []
+        for i in range(3):
+            pose.append(self.vertex(id).estimate().translation()[i])
+        pose.append(self.vertex(id).estimate().rotation().x())
+        pose.append(self.vertex(id).estimate().rotation().y())
+        pose.append(self.vertex(id).estimate().rotation().z())
+        pose.append(self.vertex(id).estimate().rotation().w())
+        return pose
+
 
 def check_id_num(input):
     output = ""
@@ -59,39 +71,35 @@ def check_id_num(input):
             output = output + str(char)
     return output
 
+
 if __name__ == '__main__':
     rospy.init_node('yamlhandler')
-
-    g2oFile = open("graph.gm2dl", "w+")
+    optimizer = GraphOptimizer()
 
     sensor_list, pose, quat = [], [], []
     bag_loc, ros_topic, node_name = "", "", ""
-    i = 1
-
+    sensor_num = 1
 
     while True:
         try:
-            pose.append(rospy.get_param("/s"+str(i)+"_pose/x"))
-            pose.append(rospy.get_param("/s"+str(i)+"_pose/y"))
-            pose.append(rospy.get_param("/s"+str(i)+"_pose/z"))
-            quat.append(rospy.get_param("/s"+str(i)+"_pose/qx"))
-            quat.append(rospy.get_param("/s"+str(i)+"_pose/qy"))
-            quat.append(rospy.get_param("/s"+str(i)+"_pose/qz"))
-            quat.append(rospy.get_param("/s"+str(i)+"_pose/qw"))
+            pose.append(rospy.get_param("/s"+str(sensor_num)+"_pose/x"))
+            pose.append(rospy.get_param("/s"+str(sensor_num)+"_pose/y"))
+            pose.append(rospy.get_param("/s"+str(sensor_num)+"_pose/z"))
+            quat.append(rospy.get_param("/s"+str(sensor_num)+"_pose/qx"))
+            quat.append(rospy.get_param("/s"+str(sensor_num)+"_pose/qy"))
+            quat.append(rospy.get_param("/s"+str(sensor_num)+"_pose/qz"))
+            quat.append(rospy.get_param("/s"+str(sensor_num)+"_pose/qw"))
 
-            bag_loc = rospy.get_param("/s"+str(i)+"_bag")
-            ros_topic = rospy.get_param("/s"+str(i)+"_topic")
-            node_name = rospy.get_param("/s"+str(i)+"_dyn_tf_node_name")
+            bag_loc = rospy.get_param("/s"+str(sensor_num)+"_bag")
+            ros_topic = rospy.get_param("/s"+str(sensor_num)+"_topic")
+            node_name = rospy.get_param("/s"+str(sensor_num)+"_dyn_tf_node_name")
 
-            sensor_list.append(Sensor(i-1, i, pose, quat, bag_loc, ros_topic, node_name))
-
-            pose = []
-            quat = []
-
+            sensor_list.append(Sensor(sensor_num, pose, quat, bag_loc, ros_topic, node_name))
+            pose, quat = [], []
+            sensor_num += 1
         except KeyError:
+            sensor_num -= 1
             break
-
-        i += 1
 
     tracking_points, node_list, unique_list = [], [], []
     bag_num = 1
@@ -99,7 +107,7 @@ if __name__ == '__main__':
 
     for sensor in sensor_list:
         bag = rosbag.Bag(sensor.bag_location)
-        print("Reading Bag "+str(bag_num)+"...")
+        print("Reading Bag "+str(bag_num)+" ...")
 
         for topic, msg, t in bag.read_messages():
             # Only odometric messages
@@ -108,9 +116,9 @@ if __name__ == '__main__':
 
             tracker_id = check_id_num(msg.child_frame_id)
 
-            # Only use the first entry of tracking point in rosbag  TODO: Use mean value over time?
+            # Only use the first entry of tracking point in rosbag  # OPTIMIZE: Use mean value over time?
             if tracker_id in unique_list:
-                continue;
+                continue
 
             cam_id = sensor.sensor_id
             pose.append(msg.pose.pose.position.x)
@@ -121,45 +129,40 @@ if __name__ == '__main__':
             quat.append(msg.pose.pose.orientation.z)
             quat.append(msg.pose.pose.orientation.w)
 
-            tracking_points.append(Tracking_Point(i-1, tracker_id, cam_id, pose, quat))
+            tracking_points.append(Tracking_Point(tracker_id, cam_id, pose, quat))
             unique_list.append(tracker_id)
-
-            pose = []
-            quat = []
-
-            if sensor.sensor_id is fixed_sensor:
-                i += 1
+            pose, quat = [], []
 
         unique_list = []
+        bag_num += 1
         bag.close()
 
-        bag_num += 1
-
     t = tf.TransformerROS(True, rospy.Duration(10.0))
+    optimizer_ids = []
 
-    print("Writing in gm2dl file...")
+    print("Generate graph for optimization...")
     for snode in sensor_list:
 
-        # Add sensor frames
-        m = geometry_msgs.msg.TransformStamped()
-        m.header.frame_id = "world"
-        m.child_frame_id = "s"+str(snode.sensor_id)
-        m.transform.translation.x = snode.pos[0]
-        m.transform.translation.y = snode.pos[1]
-        m.transform.translation.z = snode.pos[2]
-        m.transform.rotation.x = snode.quat[0]
-        m.transform.rotation.y = snode.quat[1]
-        m.transform.rotation.z = snode.quat[2]
-        m.transform.rotation.w = snode.quat[3]
-        t.setTransform(m)
-
-        g2oFile.write("VERTEX_SE3:QUAT "+str(snode.node_id)+" "+str(snode.pos[0])+" "+
-                      str(snode.pos[1])+" "+str(snode.pos[2])+" "+str(snode.quat[0])+" "+
-                      str(snode.quat[1])+" "+str(snode.quat[2])+" "+str(snode.quat[3])+"\n")
-
-        # Fixing values for first sensor
         if snode.sensor_id is fixed_sensor:
-            g2oFile.write("FIX "+str(snode.node_id)+"\n")
+            # Add sensor frame
+            m = geometry_msgs.msg.TransformStamped()
+            m.header.frame_id = "world"
+            m.child_frame_id = "s"+str(snode.sensor_id)
+            m.transform.translation.x = snode.pos[0]
+            m.transform.translation.y = snode.pos[1]
+            m.transform.translation.z = snode.pos[2]
+            m.transform.rotation.x = snode.quat[0]
+            m.transform.rotation.y = snode.quat[1]
+            m.transform.rotation.z = snode.quat[2]
+            m.transform.rotation.w = snode.quat[3]
+            t.setTransform(m)
+
+        squat = g2o.Quaternion(snode.quat[3],snode.quat[0],snode.quat[1],snode.quat[2])
+        spos = np.array([snode.pos[0],snode.pos[1],snode.pos[2]])
+        pose = g2o.SE3Quat(squat, spos)
+
+        optimizer.add_vertex(snode.sensor_id, pose.Isometry3d(), snode.sensor_id is fixed_sensor)
+        optimizer_ids.append(int(snode.sensor_id))
 
     msg_point = geometry_msgs.msg.PoseStamped()
     trans = geometry_msgs.msg.PoseStamped()
@@ -167,10 +170,10 @@ if __name__ == '__main__':
     for tnode in tracking_points:
 
         if tnode.sensor_id is fixed_sensor:
-            # Add tracker frames
+            # Add tracker frame
             m = geometry_msgs.msg.TransformStamped()
             m.header.frame_id = "s"+str(tnode.sensor_id)
-            m.child_frame_id = "t"+str(tnode.node_id)
+            m.child_frame_id = "t"+str(tnode.tracker_id)
             m.transform.translation.x = tnode.pos[0]
             m.transform.translation.y = tnode.pos[1]
             m.transform.translation.z = tnode.pos[2]
@@ -196,25 +199,45 @@ if __name__ == '__main__':
             tpose = trans.pose.position
             tquat = trans.pose.orientation
 
-            g2oFile.write("VERTEX_SE3:QUAT "+str(tnode.tracker_id)+" "+str(tpose.x)+" "+
-                      str(tpose.y)+" "+str(tpose.z)+" "+str(tquat.x)+" "+
-                      str(tquat.y)+" "+str(tquat.z)+" "+str(tquat.w)+"\n")
-            g2oFile.write("FIX "+str(tnode.tracker_id)+"\n")
+            tquat = g2o.Quaternion(tquat.w, tquat.x, tquat.y, tquat.z)
+            tpos = np.array([tpose.x, tpose.y, tpose.z])
+            pose = g2o.SE3Quat(tquat, tpos)
 
-    fixed_cov = " 10000 0 0 0 0 0 10000 0 0 0 0 10000 0 0 0 40000 0 0 40000 0 40000 "
+            optimizer.add_vertex(int(tnode.tracker_id), pose.Isometry3d())
+            optimizer_ids.append(int(tnode.tracker_id))
+
     valid_point_list = []
 
     for tpoint in tracking_points:
         if tpoint.sensor_id is fixed_sensor:
+            # Collect the ids of tracking points seen by the fixed sensor
             valid_point_list.append(tpoint.tracker_id)
+
+    cov = np.array([[10000,0,0,0,0,0],
+                    [0,10000,0,0,0,0],
+                    [0,0,10000,0,0,0],
+                    [0,0,0,40000,0,0],
+                    [0,0,0,0,40000,0],
+                    [0,0,0,0,0,40000]])
 
     for tpoint in tracking_points:
         if tpoint.tracker_id in valid_point_list:
-            g2oFile.write("EDGE_SE3:QUAT "+str(tpoint.sensor_id-1)+" "+str(tpoint.tracker_id)+" "+
-                      str(tpoint.pos[0])+" "+str(tpoint.pos[1])+" "+str(tpoint.pos[2])+" "+
-                      str(tpoint.quat[0])+" "+str(tpoint.quat[1])+" "+str(tpoint.quat[2])+" "+
-                      str(tpoint.quat[3])+fixed_cov+"\n")
+            tquat = g2o.Quaternion(tpoint.quat[3], tpoint.quat[0], tpoint.quat[1],
+                                   tpoint.quat[2])
+            tpos = np.array([tpoint.pos[0], tpoint.pos[1], tpoint.pos[2]])
+            pose = g2o.SE3Quat(tquat, tpos)
+            optimizer.add_edge([int(tpoint.sensor_id), int(tpoint.tracker_id)],
+                                pose.Isometry3d(), cov)
 
+    print("Done...\n")
+    print("Cameras before calibration: ")
+    for i in optimizer_ids[:sensor_num]:
+        print(optimizer.get_pose(i)) # Show the initial sensor params
 
-    g2oFile.close()
-    print("Done...")
+    optimizer.save("graph_init.g2o")
+    optimizer.optimize() # This is where the magical optimization happens
+    optimizer.save("graph_calibrated.g2o")
+    print("\n")
+    print("Cameras after calibration: ")
+    for i in optimizer_ids[:sensor_num]:
+        print(optimizer.get_pose(i)) # Show the calibrated sensor params
