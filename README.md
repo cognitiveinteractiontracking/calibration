@@ -11,7 +11,7 @@ tbd
 
 ## yaml_handler.py
 
-Load calibration.yaml (sensor pose, path rosbag tracking data) via rosparam. The script will read the rosbags, transform the poses to the same frame as the sensors und output the data to a gm2dl file, which is readable for the g2o library.
+Load calibration.yaml (sensor pose, path rosbag tracking data) via rosparam. It performs a calibration of given sensors by graph optimization provided from g2o. Via dynamic reconfiguration it calibrates the cameras from launch file calibration_demo (run it after launching)
 
 ## inverse_transform.py
 
@@ -40,5 +40,4 @@ This node updates a transformation between two coordinate frames with a given ro
 | ros_listener_odom_topic | string | /topic  | Listenertopic for the ros::nav_msgs::Odometry to update the tf.                                                                   |
 | parent_frame            | string | /parent | Parent frame id                                                                                                                   |
 | child_frame             | string | /child  | Child frame id                                                                                                                    |
-| rostimenow              | bool   | false   | If this is set to true, ros::now as headertimestamp will be used otherwhise the timestamp from the input ros::nav_msgs::Odometry. | 
-
+| rostimenow              | bool   | false   | If this is set to true, ros::now as headertimestamp will be used otherwhise the timestamp from the input ros::nav_msgs::Odometry. |

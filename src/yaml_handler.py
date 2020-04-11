@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import rospy
+import dynamic_reconfigure.client as reconf
 import rosbag
 import tf
 import geometry_msgs.msg
@@ -53,14 +54,23 @@ class GraphOptimizer(g2o.SparseOptimizer):
         edge.set_information(information)
         super(GraphOptimizer, self).add_edge(edge)
 
-    def get_pose(self, id):
+    def get_pose(self, id, with_euler=True):
         pose = []
         for i in range(3):
             pose.append(self.vertex(id).estimate().translation()[i])
-        pose.append(self.vertex(id).estimate().rotation().x())
-        pose.append(self.vertex(id).estimate().rotation().y())
-        pose.append(self.vertex(id).estimate().rotation().z())
-        pose.append(self.vertex(id).estimate().rotation().w())
+        if with_euler: # Transform quat to euler angles in radians
+            quaternion = (self.vertex(id).estimate().rotation().x(),
+                          self.vertex(id).estimate().rotation().y(),
+                          self.vertex(id).estimate().rotation().z(),
+                          self.vertex(id).estimate().rotation().w())
+            euler = tf.transformations.euler_from_quaternion(quaternion)
+            for i in range(3):
+                pose.append(euler[i])
+        else:
+            pose.append(self.vertex(id).estimate().rotation().x())
+            pose.append(self.vertex(id).estimate().rotation().y())
+            pose.append(self.vertex(id).estimate().rotation().z())
+            pose.append(self.vertex(id).estimate().rotation().w())
         return pose
 
 
@@ -103,8 +113,9 @@ if __name__ == '__main__':
 
     tracking_points, node_list, unique_list = [], [], []
     bag_num = 1
-    fixed_sensor = sensor_list[0].sensor_id
+    fixed_sensor = sensor_list[0].sensor_id # Assume the first sensor is the reference for graph
 
+    # Reading the rosbags for all tracking points provided by tracker
     for sensor in sensor_list:
         bag = rosbag.Bag(sensor.bag_location)
         print("Reading Bag "+str(bag_num)+" ...")
@@ -140,9 +151,9 @@ if __name__ == '__main__':
     t = tf.TransformerROS(True, rospy.Duration(10.0))
     optimizer_ids = []
 
+    # Create nodes in graph for sensors
     print("Generate graph for optimization...")
     for snode in sensor_list:
-
         if snode.sensor_id is fixed_sensor:
             # Add sensor frame
             m = geometry_msgs.msg.TransformStamped()
@@ -167,8 +178,8 @@ if __name__ == '__main__':
     msg_point = geometry_msgs.msg.PoseStamped()
     trans = geometry_msgs.msg.PoseStamped()
 
+    # Create nodes in graph for tracking points (transformed in world frame)
     for tnode in tracking_points:
-
         if tnode.sensor_id is fixed_sensor:
             # Add tracker frame
             m = geometry_msgs.msg.TransformStamped()
@@ -206,13 +217,14 @@ if __name__ == '__main__':
             optimizer.add_vertex(int(tnode.tracker_id), pose.Isometry3d())
             optimizer_ids.append(int(tnode.tracker_id))
 
-    valid_point_list = []
 
+    # Collect the ids of tracking points seen by the fixed sensor
+    valid_point_list = []
     for tpoint in tracking_points:
         if tpoint.sensor_id is fixed_sensor:
-            # Collect the ids of tracking points seen by the fixed sensor
             valid_point_list.append(tpoint.tracker_id)
 
+    # Fixed covariance for edges # OPTIMIZE: Calculate cov from tracker?
     cov = np.array([[10000,0,0,0,0,0],
                     [0,10000,0,0,0,0],
                     [0,0,10000,0,0,0],
@@ -220,6 +232,7 @@ if __name__ == '__main__':
                     [0,0,0,0,40000,0],
                     [0,0,0,0,0,40000]])
 
+    # Creating edges between sensors and tracking points
     for tpoint in tracking_points:
         if tpoint.tracker_id in valid_point_list:
             tquat = g2o.Quaternion(tpoint.quat[3], tpoint.quat[0], tpoint.quat[1],
@@ -228,16 +241,12 @@ if __name__ == '__main__':
             pose = g2o.SE3Quat(tquat, tpos)
             optimizer.add_edge([int(tpoint.sensor_id), int(tpoint.tracker_id)],
                                 pose.Isometry3d(), cov)
-
     print("Done...\n")
-    print("Cameras before calibration: ")
-    for i in optimizer_ids[:sensor_num]:
-        print(optimizer.get_pose(i)) # Show the initial sensor params
-
-    optimizer.save("graph_init.g2o")
     optimizer.optimize() # This is where the magical optimization happens
-    optimizer.save("graph_calibrated.g2o")
-    print("\n")
-    print("Cameras after calibration: ")
+
+    # Update camera poses via dynamic reconfiguration
     for i in optimizer_ids[:sensor_num]:
-        print(optimizer.get_pose(i)) # Show the calibrated sensor params
+        client = reconf.Client("tf_cam"+str(i)+"_2")
+        c = optimizer.get_pose(i)
+        client.update_configuration({"x": c[0], "y": c[1], "z": c[2],
+                                      "roll": c[3], "pitch": c[4], "yaw": c[5]})
