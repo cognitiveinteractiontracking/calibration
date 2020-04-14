@@ -11,7 +11,23 @@ tbd
 
 ## yaml_handler.py
 
-Load calibration.yaml (sensor pose, path rosbag tracking data) via rosparam. It performs a calibration of given sensors by graph optimization provided from g2o. Via dynamic reconfiguration it calibrates the cameras from launch file calibration_demo (run it after launching)
+Load calibration.yaml (sensor pose, path rosbag tracking data) via rosparam.
+It performs a calibration of given sensors by graph optimization provided from g2o.
+Via dynamic reconfiguration it calibrates the cameras from launch file calibration_demo (run it after launching).
+
+### Preliminaries for Installation
+
+Testet with ROS kinetik and Ubuntu 16.04
+
+* Build and install g2o: https://github.com/RainerKuemmerle/g2o#compilation
+* Build and install g2opy: https://github.com/uoip/g2opy#installation
+ * Substitute `cmake ..` with `cmake -DPYBIND11_PYTHON_VERSION=2.7 ..`
+ * Substitute `python setup.py install` with `sudo cp lib/g2o.so /usr/lib/python2.7/dist-packages/g2o.so`
+
+### Demo
+
+* `roslaunch calibration calibration_demo.launch`
+* `rosrun calibration yaml_handler.py`
 
 ## inverse_transform.py
 
