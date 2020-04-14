@@ -13,7 +13,13 @@
   <arg name="cam3" value="-1.683 -1.388 3.774 0.999 0.005 -0.032 -0.001"/>
   <arg name="cam4" value="1.424 -1.499 3.671 0.701 0.713 -0.006 0.013"/>
 
-  <node pkg="tf" type="static_transform_publisher" name="world_origin" args="0 0 0 0 0 0 $(arg world_frame) $(arg tracking_base_frame) 100" />
+  <!--TWB cam1-2-->
+  <node pkg="calibration" type="dynamic_transform_publisher" name="tf_world_origin">
+    <param name="tf" value="0 0 0 0 0 0 1.0"/>
+    <param name="source_frame" value="$(arg world_frame)"/>
+    <param name="target_frame" value="$(arg tracking_base_frame)"/>
+    <param name="rate" value="50.0"/>
+  </node>
 
   <!--CAMERA VIEW SETUP-->
   <!--
