@@ -9,11 +9,11 @@ tbd
 tbd
 
 
-## yaml_handler.py
+## calibrator.py
 
-Load calibration.yaml (sensor pose, path rosbag tracking data) via rosparam.
+Load `calibration.yaml` (sensor pose, path rosbag tracking data) via rosparam.
 It performs a calibration of given sensors by graph optimization provided from g2o.
-Via dynamic reconfiguration it calibrates the cameras from launch file calibration_demo (run it after launching).
+Via dynamic reconfiguration it calibrates the cameras from launch file `calibration_demo` (run it after launching).
 
 ### Preliminaries for Installation
 
@@ -27,7 +27,7 @@ Testet with ROS kinetik and Ubuntu 16.04
 ### Demo
 
 * `roslaunch calibration calibration_demo.launch`
-* `rosrun calibration yaml_handler.py`
+* `rosrun calibration calibrator.py`
 
 ## inverse_transform.py
 
