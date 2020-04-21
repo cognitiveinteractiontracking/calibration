@@ -2,6 +2,7 @@
 import rospy
 import dynamic_reconfigure.client as reconf
 import rosbag
+import yaml
 import tf
 import geometry_msgs.msg
 import numpy as np
@@ -57,7 +58,7 @@ class GraphOptimizer(g2o.SparseOptimizer):
         translation = self.vertex(id).estimate().translation()
         rotation = self.vertex(id).estimate().rotation()
         for i in range(3):
-            pose.append(translation[i])
+            pose.append(float(translation[i]))
         if with_euler: # Transform quat to euler angles in radians
             quaternion = (rotation.x(), rotation.y(), rotation.z(), rotation.w())
             euler = tf.transformations.euler_from_quaternion(quaternion)
@@ -87,23 +88,26 @@ if __name__ == '__main__':
     sensor_num = 1
 
     try:
-        origin = rospy.get_param("/calibration_frame_id")
-        pose = rospy.get_param("/calibration_offset")
-        origin_id = rospy.get_param("/calibration_frame_id")
-
-        # Generate calibration marker frame with calibration_offset as pose
-        m = geometry_msgs.msg.TransformStamped()
-        tran = m.transform.translation
-        rot = m.transform.rotation
-        m.header.frame_id = "world"
-        m.child_frame_id = origin_id
-        tran.x, tran.y, tran.z = pose['x'], pose['y'], pose['z']
-        rot.x, rot.y, rot.z, rot.w = pose['qx'], pose['qy'], pose['qz'], pose['qw']
-        t.setTransform(m)
-
+        # Getting the calibration frame
+        origin_frame = rospy.get_param("/calibration_frame_id")
     except KeyError:
-        print("Warning - Could not define origin frame. Using default world frame instead")
-        origin_id = "world"
+        try:
+            # If no calibration frame, create one with pose from calibration offset
+            cpose = rospy.get_param("/calibration_offset")
+            origin_frame = "calibration_offset"
+
+            m = geometry_msgs.msg.TransformStamped()
+            tran = m.transform.translation
+            rot = m.transform.rotation
+            m.header.frame_id = "world"
+            m.child_frame_id = origin_frame
+            tran.x, tran.y, tran.z = cpose['x'], cpose['y'], cpose['z']
+            rot.x, rot.y, rot.z, rot.w = cpose['qx'], cpose['qy'], cpose['qz'], cpose['qw']
+            t.setTransform(m)
+        except KeyError:
+            # If there is no calibration offset, assume there is no offset to world frame
+            print("Warning - Could not define origin frame. Using default world frame instead")
+            origin_frame = "world"
 
     while True:
         try:
@@ -113,7 +117,6 @@ if __name__ == '__main__':
             node_name = rospy.get_param("/s"+str(sensor_num)+"_dyn_tf_node_name")
 
             sensor_list.append(Sensor(sensor_num, pose, bag_loc, ros_topic, node_name))
-            pose, quat = [], []
             sensor_num += 1
         except KeyError:
             sensor_num -= 1
@@ -136,7 +139,8 @@ if __name__ == '__main__':
 
             tracker_id = check_id_num(msg.child_frame_id)
 
-            # Only use the first entry of tracking point in rosbag  # OPTIMIZE: Use mean value over time?
+            # Only use the first entry of tracking point in rosbag
+            # OPTIMIZE: Use mean value over time?
             if tracker_id in unique_list:
                 continue
 
@@ -144,44 +148,41 @@ if __name__ == '__main__':
             position = msg.pose.pose.position
             orientation = msg.pose.pose.orientation
             pose = {
-                "x": position.x,
-                "y": position.y,
-                "z": position.z,
-                "qx": orientation.x,
-                "qy": orientation.y,
-                "qz": orientation.z,
+                "x": position.x, "y": position.y, "z": position.z,
+                "qx": orientation.x, "qy": orientation.y, "qz": orientation.z,
                 "qw": orientation.w
             }
 
             tracking_points.append(Tracking_Point(tracker_id, cam_id, pose))
             unique_list.append(tracker_id)
-            pose, quat = [], []
 
         unique_list = []
         bag_num += 1
         bag.close()
 
+    msg_point = geometry_msgs.msg.PoseStamped()
+    trans = geometry_msgs.msg.PoseStamped()
+
     # Create nodes in graph for sensors
     print("Generate graph for optimization...")
     for snode in sensor_list:
-        if snode.id is fixed_sensor:
-            # Add sensor frame
-            m = geometry_msgs.msg.TransformStamped()
-            m.header.frame_id = origin_id
-            m.child_frame_id = "s"+str(snode.id)
-            tran = m.transform.translation
-            rot = m.transform.rotation
-            spose = snode.pose
-            tran.x, tran.y, tran.z = spose['x'], spose['y'], spose['z']
-            rot.x, rot.y, rot.z, rot.w = spose['qx'], spose['qy'], spose['qz'], spose['qw']
-            t.setTransform(m)
+
+        # Add sensor frame
+        m = geometry_msgs.msg.TransformStamped()
+        m.header.frame_id = origin_frame
+        m.child_frame_id = "s"+str(snode.id)
+        tran = m.transform.translation
+        rot = m.transform.rotation
+        spose = snode.pose
+        tran.x, tran.y, tran.z = spose['x'], spose['y'], spose['z']
+        rot.x, rot.y, rot.z, rot.w = spose['qx'], spose['qy'], spose['qz'], spose['qw']
+        t.setTransform(m)
 
         pose = g2o.SE3Quat(g2o.Quaternion(rot.w, rot.x, rot.y, rot.z),
                            np.array([tran.x, tran.y, tran.z]))
         optimizer.add_vertex(snode.id, pose.Isometry3d(), snode.id is fixed_sensor)
 
-    msg_point = geometry_msgs.msg.PoseStamped()
-    trans = geometry_msgs.msg.PoseStamped()
+
 
     # Create nodes in graph for tracking points (transformed in origin frame)
     for tnode in tracking_points:
@@ -207,7 +208,7 @@ if __name__ == '__main__':
             tf_rot.x, tf_rot.y, tf_rot.z, tf_rot.w =  rot.x, rot.y, rot.z, rot.w
 
             # Transform tracking point in sensor frame to origin frame
-            trans = t.transformPose(origin_id, msg_point)
+            trans = t.transformPose(origin_frame, msg_point)
 
             tpose = trans.pose.position
             tquat = trans.pose.orientation
@@ -243,9 +244,25 @@ if __name__ == '__main__':
     print("Done.")
     optimizer.optimize() # This is where the magical optimization happens
 
-    # Update camera poses via dynamic reconfiguration
+    yaml_dict = {}
     for sensor in sensor_list:
         client = reconf.Client(sensor.node_name)
+
+        c = optimizer.get_pose(sensor.id, False)
+        pose = {
+            "x": c[0], "y": c[1], "z": c[2], "qx": c[3], "qy": c[4], "qz": c[5], "qw": c[6]
+        }
+        # Write updated camera params in new yaml
+        yaml_dict.update({"s"+str(sensor.id)+"_bag" : sensor.bag_location,
+                          "s"+str(sensor.id)+"_topic" : sensor.ros_topic,
+                          "s"+str(sensor.id)+"_pose" : pose,
+                          "s"+str(sensor.id)+"_dyn_tf_node_name" : sensor.node_name})
+
+        # Update camera poses via dynamic reconfiguration
+        c = []
         c = optimizer.get_pose(sensor.id)
         client.update_configuration({"x": c[0], "y": c[1], "z": c[2],
-                                      "roll": c[3], "pitch": c[4], "yaw": c[5]})
+                                     "roll": c[3], "pitch": c[4], "yaw": c[5]})
+                                    
+    with open('calibrated.yaml', 'w') as out:
+        yaml.dump(yaml_dict, out, default_flow_style=False)
