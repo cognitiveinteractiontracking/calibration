@@ -26,8 +26,10 @@ Testet with ROS kinetik and Ubuntu 16.04
 
 ### Demo
 
-* `roslaunch calibration calibration_demo.launch`
-* `rosrun calibration calibrator.py`
+* Start playing the bags and visualization: `roslaunch calibration calibration_demo.launch`
+* Run calibration: `rosrun calibration calibrator.py`
+* Store the calibrated data `roslaunch calibration calibration_dump.launch`
+* Optional: Load the calibrated data `roslaunch calibration calibration_load.launch`
 
 ## inverse_transform.py
 

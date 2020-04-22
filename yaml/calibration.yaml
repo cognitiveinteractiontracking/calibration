@@ -1,7 +1,7 @@
 # Offset calibration which is applied after calibration
 # Choose either <calibration_marker_id> or <calibration_offset>
 # Behavior is as follows:
-# 1. if <calibration_frame_id> is defined:
+# 1. if <calibration_marker_id> is defined:
 #    - the frame of marker <calibration_marker_id> becomes the origin
 #    - move <calibration_dyn_tf_node_name> to <calibration_frame_id>
 #    - set all sensor frames accordingly
