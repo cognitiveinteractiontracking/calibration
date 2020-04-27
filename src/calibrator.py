@@ -2,7 +2,6 @@
 import rospy
 import dynamic_reconfigure.client as reconf
 import rosbag
-import yaml
 import tf
 import geometry_msgs.msg
 import numpy as np
@@ -244,25 +243,8 @@ if __name__ == '__main__':
     print("Done.")
     optimizer.optimize() # This is where the magical optimization happens
 
-    yaml_dict = {}
     for sensor in sensor_list:
         client = reconf.Client(sensor.node_name)
-
-        c = optimizer.get_pose(sensor.id, False)
-        pose = {
-            "x": c[0], "y": c[1], "z": c[2], "qx": c[3], "qy": c[4], "qz": c[5], "qw": c[6]
-        }
-        # Write updated camera params in new yaml
-        yaml_dict.update({"s"+str(sensor.id)+"_bag" : sensor.bag_location,
-                          "s"+str(sensor.id)+"_topic" : sensor.ros_topic,
-                          "s"+str(sensor.id)+"_pose" : pose,
-                          "s"+str(sensor.id)+"_dyn_tf_node_name" : sensor.node_name})
-
-        # Update camera poses via dynamic reconfiguration
-        c = []
         c = optimizer.get_pose(sensor.id)
         client.update_configuration({"x": c[0], "y": c[1], "z": c[2],
                                      "roll": c[3], "pitch": c[4], "yaw": c[5]})
-                                    
-    with open('calibrated.yaml', 'w') as out:
-        yaml.dump(yaml_dict, out, default_flow_style=False)
