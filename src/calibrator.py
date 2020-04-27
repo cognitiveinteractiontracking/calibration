@@ -53,29 +53,82 @@ class GraphOptimizer(g2o.SparseOptimizer):
         super(GraphOptimizer, self).add_edge(edge)
 
     def get_pose(self, id, with_euler=True):
-        pose = []
+        trans, rot = [], []
         translation = self.vertex(id).estimate().translation()
         rotation = self.vertex(id).estimate().rotation()
         for i in range(3):
-            pose.append(float(translation[i]))
+            trans.append(float(translation[i]))
         if with_euler: # Transform quat to euler angles in radians
             quaternion = (rotation.x(), rotation.y(), rotation.z(), rotation.w())
             euler = tf.transformations.euler_from_quaternion(quaternion)
             for i in range(3):
-                pose.append(euler[i])
+                rot.append(euler[i])
         else:
-            pose.append(rotation.x())
-            pose.append(rotation.y())
-            pose.append(rotation.z())
-            pose.append(rotation.w())
-        return pose
+            rot.append(rotation.x())
+            rot.append(rotation.y())
+            rot.append(rotation.z())
+            rot.append(rotation.w())
+        return (trans, rot)
 
 def check_id_num(input):
     output = ""
     for char in input:
+        # Check if input is number in ASCII
         if ord(char) in range(48,58):
             output = output + str(char)
     return output
+
+def add_frame(transformator, cur_frame, parent_frame, pose):
+    m = geometry_msgs.msg.TransformStamped()
+    m.header.frame_id = parent_frame
+    m.child_frame_id = cur_frame
+    tran = m.transform.translation
+    rot = m.transform.rotation
+    tran.x, tran.y, tran.z = pose['x'], pose['y'], pose['z']
+    rot.x, rot.y, rot.z, rot.w = pose['qx'], pose['qy'], pose['qz'], pose['qw']
+    transformator.setTransform(m)
+
+def transform_frame(transformator, cur_frame, target_frame, pose):
+    trans = geometry_msgs.msg.PoseStamped()
+    tf_pos = msg_point.pose.position
+    tf_rot = msg_point.pose.orientation
+    msg_point.header.frame_id = cur_frame
+    tf_pos.x, tf_pos.y, tf_pos.z = pose['x'], pose['y'], pose['z']
+    tf_rot.x, tf_rot.y, tf_rot.z, tf_rot.w =  pose['qx'], pose['qy'], pose['qz'], pose['qw']
+    trans = t.transformPose(target_frame, msg_point)
+    tpose = trans.pose.position
+    tquat = trans.pose.orientation
+
+    return (tpose, tquat)
+
+def transform_to_SE3Quat(transformer, cur_frame, target_frame, pose):
+    (tpose, tquat) = transform_frame(transformer, cur_frame, target_frame, pose)
+
+    return g2o.SE3Quat(g2o.Quaternion(tquat.w, tquat.x, tquat.y, tquat.z),
+                       np.array([tpose.x, tpose.y, tpose.z]))
+
+def fill_pose_from_msg(translation, rotation):
+    dict = {
+        "x": translation.x, "y": translation.y, "z": translation.z,
+        "qx": rotation.x, "qy": rotation.y, "qz": rotation.z,
+        "qw": rotation.w
+    }
+    return dict
+
+
+def fill_pose_from_list(translation, rotation, withEuler):
+    if withEuler:
+        dict = {
+            "x": translation[0], "y": translation[1], "z": translation[2],
+            "roll": rotation[0], "pitch": rotation[1], "yaw": rotation[2]
+        }
+    else:
+        dict = {
+            "x": translation[0], "y": translation[1], "z": translation[2],
+            "qx": rotation[0], "qy": rotation[1], "qz": rotation[2],
+            "qw": rotation[3]
+        }
+    return dict
 
 
 if __name__ == '__main__':
@@ -88,25 +141,20 @@ if __name__ == '__main__':
 
     try:
         # Getting the calibration frame
-        origin_frame = rospy.get_param("/calibration_frame_id")
+        origin_frame = rospy.get_param("/calibration_frame_id") # Exp: tracking_base
     except KeyError:
-        try:
-            # If no calibration frame, create one with pose from calibration offset
-            cpose = rospy.get_param("/calibration_offset")
-            origin_frame = "calibration_offset"
+        print("No calibration_frame_id found")
 
-            m = geometry_msgs.msg.TransformStamped()
-            tran = m.transform.translation
-            rot = m.transform.rotation
-            m.header.frame_id = "world"
-            m.child_frame_id = origin_frame
-            tran.x, tran.y, tran.z = cpose['x'], cpose['y'], cpose['z']
-            rot.x, rot.y, rot.z, rot.w = cpose['qx'], cpose['qy'], cpose['qz'], cpose['qw']
-            t.setTransform(m)
-        except KeyError:
-            # If there is no calibration offset, assume there is no offset to world frame
-            print("Warning - Could not define origin frame. Using default world frame instead")
-            origin_frame = "world"
+    try:
+        calibration_marker_id = rospy.get_param("/calibration_marker_id") # Tracker point
+        markerIDset = True
+    except KeyError:
+        markerIDset = False
+        print("calibration_marker_id not defined")
+
+    # TODO: If calibration_offset is set, tracking_base and reference sensor shall be
+    #       set at that pose
+    # QUESTION: What if both calibration_marker_id AND calibration_offset are set?
 
     while True:
         try:
@@ -131,11 +179,9 @@ if __name__ == '__main__':
         print("Reading Bag "+str(bag_num)+" ...")
 
         for topic, msg, _ in bag.read_messages():
-
             # Only odometric messages
             if sensor.ros_topic not in topic:
                 continue
-
             tracker_id = check_id_num(msg.child_frame_id)
 
             # Only use the first entry of tracking point in rosbag
@@ -146,14 +192,15 @@ if __name__ == '__main__':
             cam_id = sensor.id
             position = msg.pose.pose.position
             orientation = msg.pose.pose.orientation
-            pose = {
-                "x": position.x, "y": position.y, "z": position.z,
-                "qx": orientation.x, "qy": orientation.y, "qz": orientation.z,
-                "qw": orientation.w
-            }
+            pose = fill_pose_from_msg(position, orientation)
 
             tracking_points.append(Tracking_Point(tracker_id, cam_id, pose))
             unique_list.append(tracker_id)
+
+        if cam_id is fixed_sensor:
+            if str(calibration_marker_id) not in unique_list:
+                print("Warning - calibration_marker_id "+str(calibration_marker_id)+" is not seen by reference sensor.")
+                markerIDset = False
 
         unique_list = []
         bag_num += 1
@@ -165,20 +212,12 @@ if __name__ == '__main__':
     # Create nodes in graph for sensors
     print("Generate graph for optimization...")
     for snode in sensor_list:
-
-        # Add sensor frame
-        m = geometry_msgs.msg.TransformStamped()
-        m.header.frame_id = origin_frame
-        m.child_frame_id = "s"+str(snode.id)
-        tran = m.transform.translation
-        rot = m.transform.rotation
         spose = snode.pose
-        tran.x, tran.y, tran.z = spose['x'], spose['y'], spose['z']
-        rot.x, rot.y, rot.z, rot.w = spose['qx'], spose['qy'], spose['qz'], spose['qw']
-        t.setTransform(m)
+        add_frame(t, "s"+str(snode.id), origin_frame, spose)
 
-        pose = g2o.SE3Quat(g2o.Quaternion(rot.w, rot.x, rot.y, rot.z),
-                           np.array([tran.x, tran.y, tran.z]))
+        pose = g2o.SE3Quat(g2o.Quaternion(spose['qw'], spose['qx'], spose['qy'], spose['qz']),
+                           np.array([spose['x'], spose['y'], spose['z']]))
+
         optimizer.add_vertex(snode.id, pose.Isometry3d(), snode.id is fixed_sensor)
 
 
@@ -186,35 +225,10 @@ if __name__ == '__main__':
     # Create nodes in graph for tracking points (transformed in origin frame)
     for tnode in tracking_points:
         if tnode.sensor_id is fixed_sensor:
-            # Add tracker frame
-            m = geometry_msgs.msg.TransformStamped()
-            m.header.frame_id = "s"+str(tnode.sensor_id)
-            m.child_frame_id = "t"+str(tnode.tracker_id)
-            tran = m.transform.translation
-            rot = m.transform.rotation
             tpose = tnode.pose
-            tran.x, tran.y, tran.z = tpose['x'], tpose['y'], tpose['z']
-            rot.x, rot.y, rot.z, rot.w = tpose['qx'], tpose['qy'], tpose['qz'], tpose['qw']
-            t.setTransform(m)
+            add_frame(t, "t"+str(tnode.tracker_id), "s"+str(tnode.sensor_id), tpose)
 
-            # Convert tracking point from list to correct geometry_msgs.msg
-            tf_pos = msg_point.pose.position
-            tf_rot = msg_point.pose.orientation
-
-            msg_point.header.frame_id = "s"+str(tnode.sensor_id)
-
-            tf_pos.x, tf_pos.y, tf_pos.z = tran.x, tran.y, tran.z
-            tf_rot.x, tf_rot.y, tf_rot.z, tf_rot.w =  rot.x, rot.y, rot.z, rot.w
-
-            # Transform tracking point in sensor frame to origin frame
-            trans = t.transformPose(origin_frame, msg_point)
-
-            tpose = trans.pose.position
-            tquat = trans.pose.orientation
-
-            pose = g2o.SE3Quat(g2o.Quaternion(tquat.w, tquat.x, tquat.y, tquat.z),
-                               np.array([tpose.x, tpose.y, tpose.z]))
-
+            pose = transform_to_SE3Quat(t, "s"+str(tnode.sensor_id), origin_frame, tpose)
             optimizer.add_vertex(int(tnode.tracker_id), pose.Isometry3d())
 
 
@@ -224,7 +238,6 @@ if __name__ == '__main__':
         if tpoint.sensor_id is fixed_sensor:
             valid_point_list.append(tpoint.tracker_id)
 
-    # Fixed covariance for edges # OPTIMIZE: Calculate cov from tracker?
     cov = np.array([[10000,0,0,0,0,0],
                     [0,10000,0,0,0,0],
                     [0,0,10000,0,0,0],
@@ -243,8 +256,59 @@ if __name__ == '__main__':
     print("Done.")
     optimizer.optimize() # This is where the magical optimization happens
 
-    for sensor in sensor_list:
-        client = reconf.Client(sensor.node_name)
-        c = optimizer.get_pose(sensor.id)
-        client.update_configuration({"x": c[0], "y": c[1], "z": c[2],
-                                     "roll": c[3], "pitch": c[4], "yaw": c[5]})
+
+    # If calibration_frame_id is set, the transformation of tracking_base with
+    # backtransformation to world frame of its children frames is executed
+
+    if markerIDset:
+        for tnode in tracking_points:
+            if int(tnode.tracker_id) is int(calibration_marker_id) and tnode.sensor_id is fixed_sensor:
+                try:
+                    listener = tf.TransformListener()
+                    # Waiting until transform is available
+                    while not listener.canTransform("world", origin_frame, rospy.Time.now()):
+                        continue
+
+                    tpose = tnode.pose
+                    print(tpose)
+                    (transToWorld, rotToWorld) = listener.lookupTransform("world", origin_frame, rospy.Time.now())
+                    pose = fill_pose_from_list(transToWorld, rotToWorld, withEuler=False)
+                    add_frame(t, origin_frame, "world", pose)
+
+                    (trans, rot) = transform_frame(t, "s"+str(tnode.sensor_id), "world", tpose)
+
+                    quaternion = (rot.x, rot.y, rot.z, rot.w)
+                    euler = tf.transformations.euler_from_quaternion(quaternion)
+
+                    client = reconf.Client(rospy.get_param("/calibration_dyn_tf_node_name"))
+                    client.update_configuration({"x": trans.x, "y": trans.y, "z": trans.z,
+                                                 "roll": euler[0], "pitch": euler[1], "yaw": euler[2]})
+
+                    # cameras transformed back by same Offset
+                    (trans_offset, rot_offset) = transform_frame(t, "s"+str(tnode.sensor_id), origin_frame, tpose)
+                    offset = fill_pose_from_msg(trans_offset, rot_offset)
+                    add_frame(t, "new_origin", "world", offset)
+
+                    for snode in sensor_list:
+                        (c_trans, c_rot) = optimizer.get_pose(snode.id, False)
+                        cam_pose = fill_pose_from_list(c_trans, c_rot, withEuler=False)
+
+                        (trans, rot) = transform_frame(t, "world", "new_origin", cam_pose)
+                        quaternion = (rot.x, rot.y, rot.z, rot.w)
+                        euler = tf.transformations.euler_from_quaternion(quaternion)
+
+                        client = reconf.Client(snode.node_name)
+                        client.update_configuration({"x": trans.x, "y": trans.y, "z": trans.z,
+                                                     "roll": euler[0], "pitch": euler[1], "yaw": euler[2]})
+
+                except tf.LookupException:
+                    print("LookUp failed. Node "+str(origin_frame)+" not transformable")
+                    continue
+
+    # If calibration_marker_id is not set, it is assumend that world and tracking_base are equivalent
+    else:
+        for snode in sensor_list:
+            (c_trans, c_rot) = optimizer.get_pose(snode.id)
+            cam_pose = fill_pose_from_list(c_trans, c_rot, withEuler=True)
+            client = reconf.Client(snode.node_name)
+            client.update_configuration(cam_pose)
