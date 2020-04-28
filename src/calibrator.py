@@ -197,7 +197,7 @@ if __name__ == '__main__':
             tracking_points.append(Tracking_Point(tracker_id, cam_id, pose))
             unique_list.append(tracker_id)
 
-        if cam_id is fixed_sensor:
+        if cam_id is fixed_sensor and markerIDset:
             if str(calibration_marker_id) not in unique_list:
                 print("Warning - calibration_marker_id "+str(calibration_marker_id)+" is not seen by reference sensor.")
                 markerIDset = False
@@ -270,7 +270,6 @@ if __name__ == '__main__':
                         continue
 
                     tpose = tnode.pose
-                    print(tpose)
                     (transToWorld, rotToWorld) = listener.lookupTransform("world", origin_frame, rospy.Time.now())
                     pose = fill_pose_from_list(transToWorld, rotToWorld, withEuler=False)
                     add_frame(t, origin_frame, "world", pose)
