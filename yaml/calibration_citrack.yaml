@@ -1,0 +1,43 @@
+# Offset calibration which is applied after calibration
+# Choose either <calibration_marker_id> or <calibration_offset>
+# Behavior is as follows:
+# 1. if <calibration_marker_id> is defined:
+#    - the frame of marker <calibration_marker_id> becomes the origin
+#    - move <calibration_dyn_tf_node_name> to <calibration_frame_id>
+#    - set all sensor frames accordingly
+# 2. if <calibration_offset> is defined:
+#    - Set transform between <calibration_frame_id> and s1 accordingly
+
+#calibration_marker_id: 0
+calibration_offset: {x: 1.5 , y: 1.503 , z: 3.698, qx: 1.0, qy: 0.0, qz: 0.0, qw: 0.001}
+
+# All cameras will be calibrated wrt. this frame
+calibration_frame_id: tracking_base
+# The dynamic tf which defines the transform between a parent and <calibration_frame_id>
+calibration_dyn_tf_node_name: tf_world_origin
+
+# Sensors
+
+# Bag location which holds the marker tracks
+s1_bag: /tmp/cam1.bag
+# Topic inside the bag which holds the marker sub-topics like <s1_topic>/42
+s1_topic: /aruco3_node1_2/cam/odom/
+# Initial sensor pose in a common frame (get via `$rosrun tf tf_echo <common_frame> <any_sensor>`)
+s1_pose: {x: 1.5 , y: 1.5 , z: 3.698, qx: 1.0, qy: 0.0, qz: 0.0, qw: 0.0}
+# Used to reconfigure the sensor's tranform after calibration via e.g. "rosrun dynamic_reconfigure dynparam set <s1_dyn_tf_node_name> "{'x':2.0, 'y':3.0, 'z':1.5, 'roll': 0.1, 'pitch': 0.2, 'yaw': 0.3}""
+s1_dyn_tf_node_name: tf_cam1_2
+
+s2_bag: /tmp/cam2.bag
+s2_topic: /aruco3_node2_2/cam/odom/
+s2_pose: {x: -1.3071 , y: 1.5390 , z: 3.830, qx: 0.709, qy: 0.704, qz: -0.042, qw: -0.036}
+s2_dyn_tf_node_name: tf_cam2_2
+
+s3_bag: /tmp/cam3.bag
+s3_topic: /aruco3_node3_2/cam/odom/
+s3_pose: {x: -1.6830 , y: -1.3908 , z: 3.77, qx: 0.999, qy: 0.005, qz: -0.032, qw: -0.001}
+s3_dyn_tf_node_name: tf_cam3_2
+
+s4_bag: /tmp/cam4.bag
+s4_topic: /aruco3_node4_2/cam/odom/
+s4_pose: {x: 1.4243 , y: -1.5012 , z: 3.671, qx: 0.701, qy: 0.713, qz: -0.006, qw: 0.013}
+s4_dyn_tf_node_name: tf_cam4_2
