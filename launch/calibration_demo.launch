@@ -3,9 +3,10 @@
 
   <param name="/use_sim_time" value="true"/>
   <arg name="world_frame" default="world"/>
+  <arg name="calibration_config_file" default="calibration.yaml"/>
   <arg name="tracking_base_frame" default="tracking_base"/>
 
-  <rosparam subst_value="True" command="load" file="$(find calibration)/yaml/calibration.yaml" />
+  <rosparam subst_value="True" command="load" file="$(find calibration)/yaml/$(arg calibration_config_file)" />
 
   <!-- CAMERA POSES IN X Y Z QX QY QZ -->
   <arg name="cam1" value="1.500 1.503 3.698 1.000 0.000 0.000 0.001"/>
