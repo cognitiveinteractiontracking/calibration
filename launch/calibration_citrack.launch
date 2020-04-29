@@ -63,7 +63,7 @@
   </node>
 
   <!-- BAG FILES OF THE SINGLE CAMERAS -->
-  <node pkg="rosbag" type="play" name="rosbag_play_cam_1" args="--clock -l /tmp/cam1.bag /tmp/cam2.bag /tmp/cam3.bag /tmp/cam4.bag" />
+  <node pkg="rosbag" type="play" name="rosbag_play_cam_1" args="--clock -l $(find calibration)/bags/cam1.bag $(find calibration)/bags/cam2.bag $(find calibration)/bags/cam3.bag $(find calibration)/bags/cam4.bag" />
 
   <!-- RVIZ -->
   <node name="rviz" pkg="rviz" type="rviz" respawn="true" args="-d $(find calibration)/rviz/calibration_demo.rviz"/>
