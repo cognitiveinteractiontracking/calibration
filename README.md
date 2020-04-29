@@ -36,7 +36,7 @@ Testet with ROS kinetik and Ubuntu 16.04
 * Start cameras: `roslaunch demo start_cameras.launch`
 * Start tracking wrt. marker setup: `roslaunch demo start_aruco3_all.launch marker_size:=160 dictionary:=TAG36h11`
 * Record tracks in bags (stores bags to `/tmp/cam[1,2,3,4].bag`): `roslaunch demo calibration_record.launch`
-* Start playing the bags and visualization: `roslaunch calibration calibration_demo.launch calibration_config:=calibration_citrack.yaml`
+* Start playing the bags and visualization: `roslaunch calibration calibration_citrack.launch`
 * Run calibration: `rosrun calibration calibrator.py`
 * Store the calibrated data `roslaunch calibration calibration_dump.launch`
 * Optional: Load the calibrated data `roslaunch calibration calibration_load.launch`
