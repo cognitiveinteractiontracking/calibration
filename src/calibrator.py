@@ -197,9 +197,10 @@ if __name__ == '__main__':
             tracking_points.append(Tracking_Point(tracker_id, cam_id, pose))
             unique_list.append(tracker_id)
 
-        if cam_id is fixed_sensor:
+        if cam_id is fixed_sensor and markerIDset:
             if str(calibration_marker_id) not in unique_list:
                 print("Warning - calibration_marker_id "+str(calibration_marker_id)+" is not seen by reference sensor.")
+		print("Use one of these marker ids: "+str(unique_list))
                 markerIDset = False
 
         unique_list = []
@@ -209,6 +210,7 @@ if __name__ == '__main__':
     msg_point = geometry_msgs.msg.PoseStamped()
     trans = geometry_msgs.msg.PoseStamped()
 
+    node_id = 1
     # Create nodes in graph for sensors
     print("Generate graph for optimization...")
     for snode in sensor_list:
@@ -218,7 +220,8 @@ if __name__ == '__main__':
         pose = g2o.SE3Quat(g2o.Quaternion(spose['qw'], spose['qx'], spose['qy'], spose['qz']),
                            np.array([spose['x'], spose['y'], spose['z']]))
 
-        optimizer.add_vertex(snode.id, pose.Isometry3d(), snode.id is fixed_sensor)
+	optimizer.add_vertex(node_id, pose.Isometry3d(), snode.id is fixed_sensor)
+	node_id += 1
 
 
 
@@ -229,7 +232,8 @@ if __name__ == '__main__':
             add_frame(t, "t"+str(tnode.tracker_id), "s"+str(tnode.sensor_id), tpose)
 
             pose = transform_to_SE3Quat(t, "s"+str(tnode.sensor_id), origin_frame, tpose)
-            optimizer.add_vertex(int(tnode.tracker_id), pose.Isometry3d())
+	    optimizer.add_vertex(node_id, pose.Isometry3d())
+	    node_id += 1
 
 
     # Collect the ids of tracking points seen by the fixed sensor
@@ -270,7 +274,6 @@ if __name__ == '__main__':
                         continue
 
                     tpose = tnode.pose
-                    print(tpose)
                     (transToWorld, rotToWorld) = listener.lookupTransform("world", origin_frame, rospy.Time.now())
                     pose = fill_pose_from_list(transToWorld, rotToWorld, withEuler=False)
                     add_frame(t, origin_frame, "world", pose)
