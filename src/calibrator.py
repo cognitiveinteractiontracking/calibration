@@ -10,7 +10,7 @@ import g2o
 
 class Sensor:
     def __init__(self, id, pose, bag_location, ros_topic, node_name):
-        self.id = id
+        self.id = int(id)
         self.pose = pose
         self.bag_location = bag_location
         self.ros_topic = ros_topic
@@ -19,8 +19,8 @@ class Sensor:
 
 class Tracking_Point:
     def __init__(self, tracker_id, sensor_id, pose):
-        self.tracker_id = tracker_id
-        self.sensor_id = sensor_id
+        self.tracker_id = int(tracker_id)
+        self.sensor_id = int(sensor_id)
         self.pose = pose
 
 
@@ -76,7 +76,7 @@ def check_id_num(input):
         # Check if input is number in ASCII
         if ord(char) in range(48,58):
             output = output + str(char)
-    return output
+    return int(output)
 
 def add_frame(transformator, cur_frame, parent_frame, pose):
     m = geometry_msgs.msg.TransformStamped()
@@ -137,7 +137,7 @@ if __name__ == '__main__':
     t = tf.TransformerROS(True, rospy.Duration(10.0))
 
     sensor_list = []
-    sensor_num = 1
+    sensor_num, graph_id = 1, 1
 
     try:
         # Getting the calibration frame
@@ -146,7 +146,7 @@ if __name__ == '__main__':
         print("No calibration_frame_id found")
 
     try:
-        calibration_marker_id = rospy.get_param("/calibration_marker_id") # Tracker point
+        calibration_marker_id = int(rospy.get_param("/calibration_marker_id")) # Tracker point
         markerIDset = True
     except KeyError:
         markerIDset = False
@@ -165,6 +165,7 @@ if __name__ == '__main__':
 
             sensor_list.append(Sensor(sensor_num, pose, bag_loc, ros_topic, node_name))
             sensor_num += 1
+            graph_id += 1
         except KeyError:
             sensor_num -= 1
             break
@@ -198,9 +199,9 @@ if __name__ == '__main__':
             unique_list.append(tracker_id)
 
         if cam_id is fixed_sensor and markerIDset:
-            if str(calibration_marker_id) not in unique_list:
+            if calibration_marker_id not in unique_list:
                 print("Warning - calibration_marker_id "+str(calibration_marker_id)+" is not seen by reference sensor.")
-		print("Use one of these marker ids: "+str(unique_list))
+                print("Use one of these marker ids: "+str(unique_list))
                 markerIDset = False
 
         unique_list = []
@@ -210,63 +211,53 @@ if __name__ == '__main__':
     msg_point = geometry_msgs.msg.PoseStamped()
     trans = geometry_msgs.msg.PoseStamped()
 
-    node_id = 1
     # Create nodes in graph for sensors
     print("Generate graph for optimization...")
     for snode in sensor_list:
         spose = snode.pose
         add_frame(t, "s"+str(snode.id), origin_frame, spose)
-
         pose = g2o.SE3Quat(g2o.Quaternion(spose['qw'], spose['qx'], spose['qy'], spose['qz']),
                            np.array([spose['x'], spose['y'], spose['z']]))
-
-	optimizer.add_vertex(node_id, pose.Isometry3d(), snode.id is fixed_sensor)
-	node_id += 1
-
-
+        optimizer.add_vertex(snode.id, pose.Isometry3d(), snode.id is fixed_sensor)
 
     # Create nodes in graph for tracking points (transformed in origin frame)
+    assocs = []
+    graph_id = sensor_num + 1
     for tnode in tracking_points:
         if tnode.sensor_id is fixed_sensor:
             tpose = tnode.pose
             add_frame(t, "t"+str(tnode.tracker_id), "s"+str(tnode.sensor_id), tpose)
 
             pose = transform_to_SE3Quat(t, "s"+str(tnode.sensor_id), origin_frame, tpose)
-	    optimizer.add_vertex(node_id, pose.Isometry3d())
-	    node_id += 1
+            optimizer.add_vertex(graph_id, pose.Isometry3d())
+            # To avoid id conflicts in g2o graph, graph_id not tracking_id for one tracking_point
+            # graph_ids saves the association of these values
+            assocs.append((graph_id, tnode.tracker_id))
+            graph_id += 1
 
-
-    # Collect the ids of tracking points seen by the fixed sensor
-    valid_point_list = []
-    for tpoint in tracking_points:
-        if tpoint.sensor_id is fixed_sensor:
-            valid_point_list.append(tpoint.tracker_id)
-
+    # Creating edges between sensors and tracking points
     cov = np.array([[10000,0,0,0,0,0],
                     [0,10000,0,0,0,0],
                     [0,0,10000,0,0,0],
                     [0,0,0,40000,0,0],
                     [0,0,0,0,40000,0],
                     [0,0,0,0,0,40000]])
-
-    # Creating edges between sensors and tracking points
     for tpoint in tracking_points:
-        if tpoint.tracker_id in valid_point_list:
-            tpose = tpoint.pose
-            pose = g2o.SE3Quat(g2o.Quaternion(tpose['qw'], tpose['qx'], tpose['qy'], tpose['qz']),
-                               np.array([tpose['x'], tpose['y'], tpose['z']]))
-            optimizer.add_edge([int(tpoint.sensor_id), int(tpoint.tracker_id)],
-                                pose.Isometry3d(), cov)
+        for graph_id, tracker_id in assocs:
+            if tpoint.tracker_id is tracker_id:
+                tpose = tpoint.pose
+                pose = g2o.SE3Quat(g2o.Quaternion(tpose['qw'], tpose['qx'], tpose['qy'], tpose['qz']),
+                                   np.array([tpose['x'], tpose['y'], tpose['z']]))
+                optimizer.add_edge([int(tpoint.sensor_id), graph_id], pose.Isometry3d(), cov)
+
     print("Done.")
     optimizer.optimize() # This is where the magical optimization happens
 
-
     # If calibration_frame_id is set, the transformation of tracking_base with
     # backtransformation to world frame of its children frames is executed
-
     if markerIDset:
         for tnode in tracking_points:
-            if int(tnode.tracker_id) is int(calibration_marker_id) and tnode.sensor_id is fixed_sensor:
+            if tnode.tracker_id is calibration_marker_id and tnode.sensor_id is fixed_sensor:
                 try:
                     listener = tf.TransformListener()
                     # Waiting until transform is available
