@@ -152,9 +152,21 @@ if __name__ == '__main__':
         markerIDset = False
         print("calibration_marker_id not defined")
 
-    # TODO: If calibration_offset is set, tracking_base and reference sensor shall be
-    #       set at that pose
-    # QUESTION: What if both calibration_marker_id AND calibration_offset are set?
+    # If calibration_offset is set, tracking_base and reference sensor shall be
+    # set at that pose
+    try:
+        calibration_offset = rospy.get_param("/calibration_offset")
+        offsetIsSet = True
+    except KeyError:
+        offsetIsSet = False
+        print("calibration_offset not definded")
+
+    if markerIDset and offsetIsSet:
+        print("Warning: Cannot operate with both calibration_offset "+
+              "AND calibration_marker_id. Using calibration_offset per default")
+        markerIDset = False
+
+
 
     while True:
         try:
@@ -236,12 +248,8 @@ if __name__ == '__main__':
             graph_id += 1
 
     # Creating edges between sensors and tracking points
-    cov = np.array([[10000,0,0,0,0,0],
-                    [0,10000,0,0,0,0],
-                    [0,0,10000,0,0,0],
-                    [0,0,0,40000,0,0],
-                    [0,0,0,0,40000,0],
-                    [0,0,0,0,0,40000]])
+    cov = np.array([[10000,0,0,0,0,0], [0,10000,0,0,0,0], [0,0,10000,0,0,0],
+                    [0,0,0,40000,0,0], [0,0,0,0,40000,0], [0,0,0,0,0,40000]])
     for tpoint in tracking_points:
         for graph_id, tracker_id in assocs:
             if tpoint.tracker_id is tracker_id:
@@ -255,49 +263,53 @@ if __name__ == '__main__':
 
     # If calibration_frame_id is set, the transformation of tracking_base with
     # backtransformation to world frame of its children frames is executed
-    if markerIDset:
-        for tnode in tracking_points:
-            if tnode.tracker_id is calibration_marker_id and tnode.sensor_id is fixed_sensor:
-                try:
-                    listener = tf.TransformListener()
-                    # Waiting until transform is available
-                    while not listener.canTransform("world", origin_frame, rospy.Time.now()):
-                        continue
+    if markerIDset or offsetIsSet:
+        try:
+            listener = tf.TransformListener()
+            # Waiting until transform is available
+            while not listener.canTransform("world", origin_frame, rospy.Time.now()):
+                continue
 
-                    tpose = tnode.pose
-                    (transToWorld, rotToWorld) = listener.lookupTransform("world", origin_frame, rospy.Time.now())
-                    pose = fill_pose_from_list(transToWorld, rotToWorld, withEuler=False)
-                    add_frame(t, origin_frame, "world", pose)
+            (transToWorld, rotToWorld) = listener.lookupTransform("world", origin_frame, rospy.Time.now())
+            pose = fill_pose_from_list(transToWorld, rotToWorld, withEuler=False)
+            add_frame(t, origin_frame, "world", pose)
 
-                    (trans, rot) = transform_frame(t, "s"+str(tnode.sensor_id), "world", tpose)
+            if offsetIsSet:
+                tpose = calibration_offset
 
-                    quaternion = (rot.x, rot.y, rot.z, rot.w)
-                    euler = tf.transformations.euler_from_quaternion(quaternion)
+            if markerIDset:
+                for tnode in tracking_points:
+                    if tnode.tracker_id is calibration_marker_id and tnode.sensor_id is fixed_sensor:
+                        tpose = tnode.pose
 
-                    client = reconf.Client(rospy.get_param("/calibration_dyn_tf_node_name"))
-                    client.update_configuration({"x": trans.x, "y": trans.y, "z": trans.z,
-                                                 "roll": euler[0], "pitch": euler[1], "yaw": euler[2]})
+            (trans, rot) = transform_frame(t, "s"+str(fixed_sensor), "world", tpose)
 
-                    # cameras transformed back by same Offset
-                    (trans_offset, rot_offset) = transform_frame(t, "s"+str(tnode.sensor_id), origin_frame, tpose)
-                    offset = fill_pose_from_msg(trans_offset, rot_offset)
-                    add_frame(t, "new_origin", "world", offset)
+            quaternion = (rot.x, rot.y, rot.z, rot.w)
+            euler = tf.transformations.euler_from_quaternion(quaternion)
 
-                    for snode in sensor_list:
-                        (c_trans, c_rot) = optimizer.get_pose(snode.id, False)
-                        cam_pose = fill_pose_from_list(c_trans, c_rot, withEuler=False)
+            client = reconf.Client(rospy.get_param("/calibration_dyn_tf_node_name"))
+            client.update_configuration({"x": trans.x, "y": trans.y, "z": trans.z,
+                                         "roll": euler[0], "pitch": euler[1], "yaw": euler[2]})
 
-                        (trans, rot) = transform_frame(t, "world", "new_origin", cam_pose)
-                        quaternion = (rot.x, rot.y, rot.z, rot.w)
-                        euler = tf.transformations.euler_from_quaternion(quaternion)
+            # cameras transformed back by same Offset
+            (trans_offset, rot_offset) = transform_frame(t, "s"+str(fixed_sensor), origin_frame, tpose)
+            offset = fill_pose_from_msg(trans_offset, rot_offset)
+            add_frame(t, "new_origin", "world", offset)
 
-                        client = reconf.Client(snode.node_name)
-                        client.update_configuration({"x": trans.x, "y": trans.y, "z": trans.z,
-                                                     "roll": euler[0], "pitch": euler[1], "yaw": euler[2]})
+            for snode in sensor_list:
+                (c_trans, c_rot) = optimizer.get_pose(snode.id, False)
+                cam_pose = fill_pose_from_list(c_trans, c_rot, withEuler=False)
 
-                except tf.LookupException:
-                    print("LookUp failed. Node "+str(origin_frame)+" not transformable")
-                    continue
+                (trans, rot) = transform_frame(t, "world", "new_origin", cam_pose)
+                quaternion = (rot.x, rot.y, rot.z, rot.w)
+                euler = tf.transformations.euler_from_quaternion(quaternion)
+
+                client = reconf.Client(snode.node_name)
+                client.update_configuration({"x": trans.x, "y": trans.y, "z": trans.z,
+                                             "roll": euler[0], "pitch": euler[1], "yaw": euler[2]})
+
+        except tf.LookupException:
+            print("LookUp failed. Node "+str(origin_frame)+" not transformable")
 
     # If calibration_marker_id is not set, it is assumend that world and tracking_base are equivalent
     else:
