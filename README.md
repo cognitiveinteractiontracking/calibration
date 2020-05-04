@@ -31,6 +31,16 @@ Testet with ROS kinetik and Ubuntu 16.04
 * Store the calibrated data `roslaunch calibration calibration_dump.launch`
 * Optional: Load the calibrated data `roslaunch calibration calibration_load.launch`
 
+### CITrack calibration
+
+* Start cameras: `roslaunch demo start_cameras.launch`
+* Start tracking wrt. marker setup: `roslaunch demo start_aruco3_all.launch marker_size:=160 dictionary:=TAG36h11`
+* Record tracks in bags (stores bags to `/tmp/cam[1,2,3,4].bag`): `roslaunch demo calibration_record.launch`
+* Start playing the bags and visualization: `roslaunch calibration calibration_citrack.launch`
+* Run calibration: `rosrun calibration calibrator.py`
+* Store the calibrated data `roslaunch calibration calibration_dump.launch`
+* Optional: Load the calibrated data `roslaunch calibration calibration_load.launch`
+
 ## inverse_transform.py
 
 Calculates the inverse transformation and prints it to std::out so that it can be used by tf static_transform_publisher

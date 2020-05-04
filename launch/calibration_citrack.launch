@@ -3,7 +3,7 @@
 
   <param name="/use_sim_time" value="true"/>
   <arg name="world_frame" default="world"/>
-  <arg name="calibration_config_file" default="calibration.yaml"/>
+  <arg name="calibration_config_file" default="calibration_citrack.yaml"/>
   <arg name="tracking_base_frame" default="tracking_base"/>
 
   <rosparam subst_value="True" command="load" file="$(find calibration)/yaml/$(arg calibration_config_file)" />
@@ -63,7 +63,7 @@
   </node>
 
   <!-- BAG FILES OF THE SINGLE CAMERAS -->
-  <node pkg="rosbag" type="play" name="rosbag_play_cam_1" args="--clock -l $(find calibration)/bags/surface_size_150_apriltag36h11_id_0_degree_0_cam1_2_3_4_5_2018-05-11-17-00-32.bag_speed_1_aruco3_node1_2.conservative_notTracking.bag $(find calibration)/bags/surface_size_150_apriltag36h11_id_0_degree_0_cam1_2_3_4_5_2018-05-11-17-00-32.bag_speed_1_aruco3_node2_2.conservative_notTracking.bag $(find calibration)/bags/surface_size_150_apriltag36h11_id_0_degree_0_cam1_2_3_4_5_2018-05-11-17-00-32.bag_speed_1_aruco3_node3_2.conservative_notTracking.bag $(find calibration)/bags/surface_size_150_apriltag36h11_id_0_degree_0_cam1_2_3_4_5_2018-05-11-17-00-32.bag_speed_1_aruco3_node4_2.conservative_notTracking.bag" />
+  <node pkg="rosbag" type="play" name="rosbag_play_cam_1" args="--clock -l $(find calibration)/bags/cam1.bag $(find calibration)/bags/cam2.bag $(find calibration)/bags/cam3.bag $(find calibration)/bags/cam4.bag" />
 
   <!-- RVIZ -->
   <node name="rviz" pkg="rviz" type="rviz" respawn="true" args="-d $(find calibration)/rviz/calibration_demo.rviz"/>
