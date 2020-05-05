@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<launch>
+
+  <node pkg="dynamic_reconfigure" type="dynparam" name="dump1" args="dump /tf_cam1_2 $(find calibration)/yaml/tf_cam1_2.yaml" />
+  <node pkg="dynamic_reconfigure" type="dynparam" name="dump2" args="dump /tf_cam2_2 $(find calibration)/yaml/tf_cam2_2.yaml" />
+  <node pkg="dynamic_reconfigure" type="dynparam" name="dump3" args="dump /tf_cam3_2 $(find calibration)/yaml/tf_cam3_2.yaml" />
+  <node pkg="dynamic_reconfigure" type="dynparam" name="dump4" args="dump /tf_cam4_2 $(find calibration)/yaml/tf_cam4_2.yaml" />
+  <node pkg="dynamic_reconfigure" type="dynparam" name="dump5" args="dump /tf_world_origin $(find calibration)/yaml/tf_world_origin.yaml" />
+
+</launch>

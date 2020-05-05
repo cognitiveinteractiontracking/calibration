@@ -1,0 +1,70 @@
+<?xml version="1.0"?>
+<launch>
+
+  <param name="/use_sim_time" value="true"/>
+  <arg name="world_frame" default="world"/>
+  <arg name="calibration_config_file" default="calibration.yaml"/>
+  <arg name="tracking_base_frame" default="tracking_base"/>
+
+  <rosparam subst_value="True" command="load" file="$(find calibration)/yaml/$(arg calibration_config_file)" />
+
+  <!-- CAMERA POSES IN X Y Z QX QY QZ -->
+  <arg name="cam1" value="1.500 1.503 3.698 1.000 0.000 0.000 0.001"/>
+  <arg name="cam2" value="-1.307 1.542 3.830 0.709 0.704 -0.042 -0.036"/>
+  <arg name="cam3" value="-1.683 -1.388 3.774 0.999 0.005 -0.032 -0.001"/>
+  <arg name="cam4" value="1.424 -1.499 3.671 0.701 0.713 -0.006 0.013"/>
+
+  <!--TWB world to camera origin -->
+  <node pkg="calibration" type="dynamic_transform_publisher" name="tf_world_origin">
+    <param name="tf" value="0 0 0 0 0 0 1.0"/>
+    <param name="source_frame" value="$(arg world_frame)"/>
+    <param name="target_frame" value="$(arg tracking_base_frame)"/>
+    <param name="rate" value="50.0"/>
+  </node>
+
+  <!--CAMERA VIEW SETUP-->
+  <!--
+  <node pkg="tf" type="static_transform_publisher" name="tf_cam1" args="$(arg cam1) $(arg tracking_base_frame) cam1 100" />
+  <node pkg="tf" type="static_transform_publisher" name="tf_cam2" args="$(arg cam2) $(arg tracking_base_frame) cam2 100" />
+  <node pkg="tf" type="static_transform_publisher" name="tf_cam3" args="$(arg cam3) $(arg tracking_base_frame) cam3 100" />
+  <node pkg="tf" type="static_transform_publisher" name="tf_cam4" args="$(arg cam4) $(arg tracking_base_frame) cam4 100" />
+  -->
+
+  <!--TWB cam1-2-->
+  <node pkg="calibration" type="dynamic_transform_publisher" name="tf_cam1_2">
+    <param name="tf" value="$(arg cam1)"/>
+    <param name="source_frame" value="$(arg tracking_base_frame)"/>
+    <param name="target_frame" value="cam1"/>
+    <param name="rate" value="50.0"/>
+  </node>
+
+  <!--TWB cam2-2-->
+  <node pkg="calibration" type="dynamic_transform_publisher" name="tf_cam2_2">
+    <param name="tf" value="$(arg cam2)"/>
+    <param name="source_frame" value="$(arg tracking_base_frame)"/>
+    <param name="target_frame" value="cam2"/>
+    <param name="rate" value="50.0"/>
+  </node>
+
+  <!--TWB cam3-2-->
+  <node pkg="calibration" type="dynamic_transform_publisher" name="tf_cam3_2">
+    <param name="tf" value="$(arg cam3)"/>
+    <param name="source_frame" value="$(arg tracking_base_frame)"/>
+    <param name="target_frame" value="cam3"/>
+    <param name="rate" value="50.0"/>
+  </node>
+
+  <!--TWB cam4-2-->
+  <node pkg="calibration" type="dynamic_transform_publisher" name="tf_cam4_2">
+    <param name="tf" value="$(arg cam4)"/>
+    <param name="source_frame" value="$(arg tracking_base_frame)"/>
+    <param name="target_frame" value="cam4"/>
+    <param name="rate" value="50.0"/>
+  </node>
+
+  <!-- BAG FILES OF THE SINGLE CAMERAS -->
+  <node pkg="rosbag" type="play" name="rosbag_play_cam_1" args="--clock -l $(find calibration)/bags/surface_size_150_apriltag36h11_id_0_degree_0_cam1_2_3_4_5_2018-05-11-17-00-32.bag_speed_1_aruco3_node1_2.conservative_notTracking.bag $(find calibration)/bags/surface_size_150_apriltag36h11_id_0_degree_0_cam1_2_3_4_5_2018-05-11-17-00-32.bag_speed_1_aruco3_node2_2.conservative_notTracking.bag $(find calibration)/bags/surface_size_150_apriltag36h11_id_0_degree_0_cam1_2_3_4_5_2018-05-11-17-00-32.bag_speed_1_aruco3_node3_2.conservative_notTracking.bag $(find calibration)/bags/surface_size_150_apriltag36h11_id_0_degree_0_cam1_2_3_4_5_2018-05-11-17-00-32.bag_speed_1_aruco3_node4_2.conservative_notTracking.bag" />
+
+  <!-- RVIZ -->
+  <node name="rviz" pkg="rviz" type="rviz" respawn="true" args="-d $(find calibration)/rviz/calibration_demo.rviz"/>
+</launch>
