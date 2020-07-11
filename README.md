@@ -1,19 +1,10 @@
-# calibration
+# The calibration package
 
-## one_shot_calib_node
+Calibrate any sensor network which provides ododometry messages of common hypothesis (trackings).
 
-tbd
+## Graph Calibration
 
-## dynamic_transform_publisher
-
-tbd
-
-
-## calibrator.py
-
-Load `calibration.yaml` (sensor pose, path rosbag tracking data) via rosparam.
-It performs a calibration of given sensors by graph optimization provided from g2o.
-Via dynamic reconfiguration it calibrates the cameras from launch file `calibration_demo` (run it after launching).
+Performs a calibration of given sensors by graph optimization provided from g2o.
 
 ### Preliminaries for Installation
 
@@ -42,10 +33,6 @@ Testet with ROS kinetik and Ubuntu 16.04
 * Store the calibrated data `roslaunch calibration calibration_dump.launch`
 * Optional: Load the calibrated data `roslaunch calibration calibration_load.launch`
 
-## inverse_transform.py
-
-Calculates the inverse transformation and prints it to std::out so that it can be used by tf static_transform_publisher
-
 ### Examples
 
 ```
@@ -58,11 +45,44 @@ $ ./inverse_transform.py -x 100. -y 2 -z 0 -R 0 -P 0 -Y 0
 $ rosrun tf static_transform_publisher $(./inverse_transform.py -x 100. -y 2 -z 0 -R 0 -P 0 -Y 0) source_frame target_frame 100
 ```
 
-## odom_to_tf
+## Nodes and Scripts
+
+### one_shot_calib_node
+
+tbd
+
+### dynamic_transform_publisher
+
+Like a common transform_publisher, but with dynamic reconfiguration of the transformation parameters.
+
+n.param<std::string>("tf", tfStr, ""); // (m,m,m,rad,rad,rad) or (m,m,m,1,1,1,1) in the form "2 1.1 4 3.2 1 4"
+  n.param<std::string>("source_frame", sourceFrameId, "");
+  n.param<std::string>("target_frame", targetFrameId, "");
+  n.param<double>("rate", rate, 1); // (Hz) Publish rate
+
+| Name | Type | Default | Description |
+| --- | --- | --- | --- |
+| tf | string | | Transformation from parent to child frame. Can be "x y z R P Y" or "x y z qx qy qz qw" |
+| parent_frame | string | | Parent frame id |
+| child_frame | string | | Child frame id |
+| rate | double | 1 | Publish rate in Hz |
+
+### calibration.py
+
+Performs a calibration of given sensors by graph optimization provided from g2o.
+
+1. Load `calibration.yaml` (initial sensor pose and path to rosbag tracking data) via rosparam.
+1. `calibration.py` calibrates the sensors via dynamic reconfiguration. Therefore, all sensor tf's need to be set up by `dynamic_transform_publisher`.
+
+### inverse_transform.py
+
+Calculates the inverse transformation and prints it to std::out so that it can be used by tf static_transform_publisher
+
+### odom_to_tf
 
 This node updates a transformation between two coordinate frames with a given ros::nav_msgs::Odometry.
 
-### Parameter
+#### Parameter
 
 |          Name           |  Type  | Default |                                                            Description                                                            |
 | ----------------------- | ------ | ------- | --------------------------------------------------------------------------------------------------------------------------------- |
