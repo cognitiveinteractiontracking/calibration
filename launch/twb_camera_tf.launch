@@ -1,3 +1,4 @@
+<?xml version="1.0"?>
 <launch>
   <node pkg="calib" type="dynamic_transform_publisher" name="tf_cam1" output="screen">
     <param name="tf" value="1.05607 1.02835 3.75077 3.1403 0.0130538 0.0128875"/>

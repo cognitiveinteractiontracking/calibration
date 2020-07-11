@@ -9,7 +9,7 @@
 #    - Set transform between <calibration_frame_id> and s1 accordingly
 
 #calibration_marker_id: 0
-calibration_offset: {x: 1.5 , y: 1.503 , z: 3.698, qx: 1.0, qy: 0.0, qz: 0.0, qw: 0.001}
+calibration_offset: {x: 0.0 , y: 0.0 , z: 0.0, qx: 0.0, qy: 0.0, qz: 0.0, qw: 1.0}
 
 # All cameras will be calibrated wrt. this frame
 calibration_frame_id: tracking_base
