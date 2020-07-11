@@ -49,16 +49,17 @@ $ rosrun tf static_transform_publisher $(./inverse_transform.py -x 100. -y 2 -z 
 
 ### one_shot_calib_node
 
-tbd
+Records a single hypothesis multiple times and performs [Slerp](https://en.wikipedia.org/wiki/Slerp) on angles and arithmetic mean on translations.
+The result is printed out as transformation from the parent to the child frame of the odometry message.
+
+| Name | Type | Default | Description |
+| --- | --- | --- | --- |
+| topic | string | /odom | Topic to record the hypothesis |
+| percepts | int | 1 | Number of records to make from the hypothesis |
 
 ### dynamic_transform_publisher
 
 Like a common transform_publisher, but with dynamic reconfiguration of the transformation parameters.
-
-n.param<std::string>("tf", tfStr, ""); // (m,m,m,rad,rad,rad) or (m,m,m,1,1,1,1) in the form "2 1.1 4 3.2 1 4"
-  n.param<std::string>("source_frame", sourceFrameId, "");
-  n.param<std::string>("target_frame", targetFrameId, "");
-  n.param<double>("rate", rate, 1); // (Hz) Publish rate
 
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
